@@ -1,0 +1,96 @@
+import 'generated/app_localizations.dart';
+
+extension AppLocalizedStrings on AppLocalizations {
+  String get languageLabel {
+    return switch (localeName) {
+      'nl' => 'Nederlands',
+      'en' => 'English',
+      'de' => 'Deutsch',
+      _ => 'Français',
+    };
+  }
+
+  String fieldLabel(String key) {
+    return switch (key) {
+      'companyName' => field_companyName,
+      'siteConcerned' => field_siteConcerned,
+      'serviceConcerned' => field_serviceConcerned,
+      'author' => field_author,
+      'version' => field_version,
+      'visitDate' => field_visitDate,
+      'documentObjective' => field_documentObjective,
+      'includedLocations' => field_includedLocations,
+      'excludedLocations' => field_excludedLocations,
+      'concernedPositions' => field_concernedPositions,
+      'concernedTasks' => field_concernedTasks,
+      'includedSituations' => field_includedSituations,
+      'exposureDuration' => field_exposureDuration,
+      'workMode' => field_workMode,
+      'fieldVisitDone' => field_fieldVisitDone,
+      'jobObservationDone' => field_jobObservationDone,
+      'workersConsulted' => field_workersConsulted,
+      'managementConsulted' => field_managementConsulted,
+      'cpptConsulted' => field_cpptConsulted,
+      'incidentRegisterAvailable' => field_incidentRegisterAvailable,
+      'photosAvailable' => field_photosAvailable,
+      'controlReportsAvailable' => field_controlReportsAvailable,
+      'technicalSheetsAvailable' => field_technicalSheetsAvailable,
+      'safetyDataSheetsAvailable' => field_safetyDataSheetsAvailable,
+      'sector' => field_sector,
+      'workerCount' => field_workerCount,
+      'activity' => field_activity,
+      'equipment' => field_equipment,
+      'dangerousProducts' => field_dangerousProducts,
+      'exposedWorkers' => field_exposedWorkers,
+      'knownIncidents' => field_knownIncidents,
+      'constraints' => field_constraints,
+      'additionalInformation' => field_additionalInformation,
+      'writtenInstructions' => field_writtenInstructions,
+      'completedTrainings' => field_completedTrainings,
+      'availablePpe' => field_availablePpe,
+      'periodicControls' => field_periodicControls,
+      'availableEvidence' => field_availableEvidence,
+      'oralMeasures' => field_oralMeasures,
+      'measuresToVerify' => field_measuresToVerify,
+      'workAtHeight' => field_workAtHeight,
+      'dangerousMachines' => field_dangerousMachines,
+      'chemicalProducts' => field_chemicalProducts,
+      'manualHandling' => field_manualHandling,
+      'vehiclePedestrianTraffic' => field_vehiclePedestrianTraffic,
+      'noise' => field_noise,
+      'fireRisk' => field_fireRisk,
+      'loneWork' => field_loneWork,
+      'coactivity' => field_coactivity,
+      'weatherConstraints' => field_weatherConstraints,
+      'newWorkers' => field_newWorkers,
+      'temporaryWorkers' => field_temporaryWorkers,
+      'youngWorkers' => field_youngWorkers,
+      'pregnantOrBreastfeedingWorkers' => field_pregnantOrBreastfeedingWorkers,
+      'medicalRestrictionsWorkers' => field_medicalRestrictionsWorkers,
+      'isolatedWorkers' => field_isolatedWorkers,
+      'subcontractors' => field_subcontractors,
+      'cpptPresence' => field_cpptPresence,
+      'preventionService' => field_preventionService,
+      'feedAnnualActionPlan' => field_feedAnnualActionPlan,
+      'feedGlobalPreventionPlan' => field_feedGlobalPreventionPlan,
+      'presentToCppt' => field_presentToCppt,
+      'externalServiceValidation' => field_externalServiceValidation,
+      'occupationalDoctorAdvice' => field_occupationalDoctorAdvice,
+      _ => key,
+    };
+  }
+
+  String sectionTitle(String key) {
+    return switch (key) {
+      'identification' => formSectionIdentification,
+      'scope' => formSectionScope,
+      'sources' => formSectionSources,
+      'activity' => formSectionActivity,
+      'measures' => formSectionMeasures,
+      'risks' => formSectionRisks,
+      'workers' => formSectionWorkers,
+      'prevention' => formSectionPrevention,
+      _ => key,
+    };
+  }
+}
