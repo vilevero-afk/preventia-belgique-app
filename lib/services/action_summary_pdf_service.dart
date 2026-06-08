@@ -390,36 +390,36 @@ class ActionSummaryPdfService {
   static String _normalizeFrenchText(String text) {
     return PdfExportService.normalizePdfText(
       text
-        .replaceAll('l analyse', 'l’analyse')
-        .replaceAll('L analyse', 'L’analyse')
-        .replaceAll('d analyse', 'd’analyse')
-        .replaceAll('D analyse', 'D’analyse')
-        .replaceAll('d intervention', 'd’intervention')
-        .replaceAll('D intervention', 'D’intervention')
-        .replaceAll('c est', 'c’est')
-        .replaceAll('C est', 'C’est')
-        .replaceAll('d aide', 'd’aide')
-        .replaceAll('D aide', 'D’aide')
-        .replaceAll('d expérience', 'd’expérience')
-        .replaceAll('D expérience', 'D’expérience')
-        .replaceAll('l état', 'l’état')
-        .replaceAll('L état', 'L’état')
-        .replaceAll('l entretien', 'l’entretien')
-        .replaceAll('L entretien', 'L’entretien')
-        .replaceAll('Chef d équipe', 'Chef d’équipe')
-        .replaceAll(
-          'Company: Municipal’Administration',
-          'Company: Municipal Administration',
-        )
-        .replaceAll(
-          'Company : Municipal’Administration',
-          'Company: Municipal Administration',
-        )
-        .replaceAll('road’intervention', 'road intervention')
-        .replaceAll('possible’intervention', 'possible intervention')
-        .replaceAll('mise en uvre', 'mise en œuvre')
-        .replaceAll('retour d expérience', 'retour d’expérience')
-        .replaceAll('Plan Annuel d Action', 'Plan Annuel d’Action'),
+          .replaceAll('l analyse', 'l’analyse')
+          .replaceAll('L analyse', 'L’analyse')
+          .replaceAll('d analyse', 'd’analyse')
+          .replaceAll('D analyse', 'D’analyse')
+          .replaceAll('d intervention', 'd’intervention')
+          .replaceAll('D intervention', 'D’intervention')
+          .replaceAll('c est', 'c’est')
+          .replaceAll('C est', 'C’est')
+          .replaceAll('d aide', 'd’aide')
+          .replaceAll('D aide', 'D’aide')
+          .replaceAll('d expérience', 'd’expérience')
+          .replaceAll('D expérience', 'D’expérience')
+          .replaceAll('l état', 'l’état')
+          .replaceAll('L état', 'L’état')
+          .replaceAll('l entretien', 'l’entretien')
+          .replaceAll('L entretien', 'L’entretien')
+          .replaceAll('Chef d équipe', 'Chef d’équipe')
+          .replaceAll(
+            'Company: Municipal’Administration',
+            'Company: Municipal Administration',
+          )
+          .replaceAll(
+            'Company : Municipal’Administration',
+            'Company: Municipal Administration',
+          )
+          .replaceAll('road’intervention', 'road intervention')
+          .replaceAll('possible’intervention', 'possible intervention')
+          .replaceAll('mise en uvre', 'mise en œuvre')
+          .replaceAll('retour d expérience', 'retour d’expérience')
+          .replaceAll('Plan Annuel d Action', 'Plan Annuel d’Action'),
     );
   }
 }

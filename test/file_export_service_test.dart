@@ -121,5 +121,50 @@ void main() {
         'AR-2026-0001-gemeentebestuur-van-verviers-technische-dienst-risicoanalyse.pdf',
       );
     });
+
+    test('builds English names from content company and short service', () {
+      const content = '''
+1. Document identification
+
+Company name: Municipal Administration of Verviers
+Site concerned: Municipal workshop of Verviers, storage areas, vehicle garage, technical rooms and interventions on municipal sites
+Service concerned: Technical Department
+''';
+
+      final title = FileExportService.projectTitleFromContent(content);
+
+      expect(
+        title,
+        'Municipal Administration of Verviers – Technical Department',
+      );
+      expect(
+        FileExportService.riskAnalysisFileName(
+          referenceNumber: 'AR-2026-0001',
+          projectTitle: title,
+          languageCode: 'en',
+        ),
+        'AR-2026-0001-municipal-administration-of-verviers-technical-department-risk-assessment.pdf',
+      );
+      expect(
+        FileExportService.actionSummaryFileName(
+          referenceNumber: 'AR-2026-0001',
+          projectTitle: title,
+          languageCode: 'en',
+        ),
+        'AR-2026-0001-municipal-administration-of-verviers-technical-department-action-summary.pdf',
+      );
+    });
+
+    test('does not use bad leading title fragments for export names', () {
+      expect(
+        FileExportService.riskAnalysisFileName(
+          referenceNumber: 'AR-2026-0001',
+          projectTitle:
+              'of Verviers Technical Department concerned technical department maintenance of buildings roads and public areas',
+          languageCode: 'en',
+        ),
+        'AR-2026-0001-risk-assessment.pdf',
+      );
+    });
   });
 }

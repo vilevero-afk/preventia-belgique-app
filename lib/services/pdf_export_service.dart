@@ -44,15 +44,10 @@ class PdfExportService {
       'Information à compléter ou à valider sur le terrain.';
   static const Map<String, String> _missingSectionTextsByLanguage = {
     'fr': 'Information à compléter ou à valider sur le terrain.',
-    'nl':
-        'Informatie aan te vullen of te valideren tijdens het terreinbezoek.',
+    'nl': 'Informatie aan te vullen of te valideren tijdens het terreinbezoek.',
     'en': 'Information to be completed or validated during the site visit.',
     'de': 'Informationen sind vor Ort zu ergänzen oder zu validieren.',
   };
-  static const _actionPlanMissingText =
-      'Le plan d’action doit être complété ou régénéré.';
-  static const _riskTableMissingText =
-      'Le tableau d’analyse détaillée doit être complété après observation de terrain ou relance de la génération IA.';
   static const Map<String, String> _actionPlanMissingTextsByLanguage = {
     'fr': 'Le plan d’action doit être complété ou régénéré.',
     'nl': 'Het actieplan moet worden aangevuld of opnieuw gegenereerd.',
@@ -544,10 +539,7 @@ class PdfExportService {
               _displayCell(risk.value('responsable'), language),
               _displayCell(risk.value('échéance'), language),
               _displayCell(
-                risk.value(
-                  'score résiduel estimé',
-                  fallback: 'score résiduel',
-                ),
+                risk.value('score résiduel estimé', fallback: 'score résiduel'),
                 language,
               ),
             ],
@@ -917,8 +909,7 @@ class PdfExportService {
 
   static String _fixAnomalousEnglishApostrophes(String input) {
     const contractionSuffixes = {'re', 've', 'll'};
-    return input
-        .replaceAllMapped(RegExp(r'\b([A-Za-z]{2,})[’\']([A-Za-z]{2,})\b'), (
+    return input.replaceAllMapped(RegExp(r"([A-Za-z]{2,})[’']([A-Za-z]{2,})"), (
       match,
     ) {
       final suffix = match.group(2)!.toLowerCase();
@@ -1339,8 +1330,9 @@ class PdfExportService {
           return !_isMarkdownSeparatorRow(row);
         })
         .map(
-          (row) =>
-              row.map((cell) => _cleanMarkdownText(cell, language: language)).toList(),
+          (row) => row
+              .map((cell) => _cleanMarkdownText(cell, language: language))
+              .toList(),
         )
         .toList();
   }
@@ -1945,7 +1937,10 @@ class PdfExportService {
 
     return [
       for (var index = 0; index < usefulRisks.length; index++)
-        _buildBullet(_generatedPriorityText(index, usefulRisks[index], language), language),
+        _buildBullet(
+          _generatedPriorityText(index, usefulRisks[index], language),
+          language,
+        ),
     ];
   }
 

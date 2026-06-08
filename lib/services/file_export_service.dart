@@ -234,12 +234,7 @@ class FileExportService {
     }
     final sanitized = sanitizeFileName('$title.pdf');
     final base = sanitized.substring(0, sanitized.length - 4).toLowerCase();
-    const bannedPrefixes = [
-      'of-',
-      'concerned-',
-      'site-',
-      'service-concerned-',
-    ];
+    const bannedPrefixes = ['of-', 'concerned-', 'site-', 'service-concerned-'];
     if (bannedPrefixes.any(base.startsWith)) {
       return '';
     }
@@ -253,13 +248,18 @@ class FileExportService {
           .replaceAll('|', ' ')
           .replaceAll('#', '')
           .trim();
+      final lowerLine = line.toLowerCase();
       for (final label in labels) {
-        final index = line.toLowerCase().indexOf(label.toLowerCase());
-        if (index == -1) {
+        final lowerLabel = label.toLowerCase();
+        if (!lowerLine.startsWith(lowerLabel)) {
+          continue;
+        }
+        final afterLabel = line.substring(label.length).trim();
+        if (!RegExp(r'^[:\-–]').hasMatch(afterLabel)) {
           continue;
         }
         final value = line
-            .substring(index + label.length)
+            .substring(label.length)
             .trim()
             .replaceFirst(RegExp(r'^[:\-–]\s*'), '')
             .split(RegExp(r'\s{2,}'))

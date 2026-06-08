@@ -207,12 +207,16 @@ class AnalysisProjectService {
           .replaceAll('|', ' ')
           .replaceAll('#', '')
           .trim();
+      final lowerLine = line.toLowerCase();
       for (final label in labels) {
-        final index = line.toLowerCase().indexOf(label.toLowerCase());
-        if (index == -1) {
+        final lowerLabel = label.toLowerCase();
+        if (!lowerLine.startsWith(lowerLabel)) {
           continue;
         }
-        final afterLabel = line.substring(index + label.length).trim();
+        final afterLabel = line.substring(label.length).trim();
+        if (!RegExp(r'^[:\-–]').hasMatch(afterLabel)) {
+          continue;
+        }
         final cleaned = afterLabel
             .replaceFirst(RegExp(r'^[:\-–]\s*'), '')
             .split(RegExp(r'\s{2,}|\s+[|]\s+'))

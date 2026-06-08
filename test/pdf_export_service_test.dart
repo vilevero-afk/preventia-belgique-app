@@ -71,25 +71,28 @@ void main() {
       );
     });
 
-    test('fixes abnormal English apostrophes without breaking contractions', () {
-      final normalized = PdfExportService.normalizePdfText(
-        'Municipal’Administration, municipal’interventions, '
-        'specialised’interventions, road’interventions, don’t, isn’t, '
-        'worker’s, employer’s, l’analyse, d’intervention',
-        language: 'en',
-      );
+    test(
+      'fixes abnormal English apostrophes without breaking contractions',
+      () {
+        final normalized = PdfExportService.normalizePdfText(
+          'Municipal’Administration, municipal’interventions, '
+          'specialised’interventions, road’interventions, don’t, isn’t, '
+          'worker’s, employer’s, l’analyse, d’intervention',
+          language: 'en',
+        );
 
-      expect(normalized, contains('Municipal Administration'));
-      expect(normalized, contains('municipal interventions'));
-      expect(normalized, contains('specialised interventions'));
-      expect(normalized, contains('road interventions'));
-      expect(normalized, contains('don’t'));
-      expect(normalized, contains('isn’t'));
-      expect(normalized, contains('worker’s'));
-      expect(normalized, contains('employer’s'));
-      expect(normalized, contains('l’analyse'));
-      expect(normalized, contains('d’intervention'));
-    });
+        expect(normalized, contains('Municipal Administration'));
+        expect(normalized, contains('municipal interventions'));
+        expect(normalized, contains('specialised interventions'));
+        expect(normalized, contains('road interventions'));
+        expect(normalized, contains('don’t'));
+        expect(normalized, contains('isn’t'));
+        expect(normalized, contains('worker’s'));
+        expect(normalized, contains('employer’s'));
+        expect(normalized, contains('l’analyse'));
+        expect(normalized, contains('d’intervention'));
+      },
+    );
   });
 
   group('PdfExportService.getRiskLevelFromScore', () {
