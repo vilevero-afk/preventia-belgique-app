@@ -65,6 +65,7 @@ class DocumentFormData {
     required this.presentToCppt,
     required this.externalServiceValidation,
     required this.occupationalDoctorAdvice,
+    this.extraFields = const {},
   });
 
   static const unknownValue = 'Non renseigné / à vérifier';
@@ -134,6 +135,7 @@ class DocumentFormData {
   final String presentToCppt;
   final String externalServiceValidation;
   final String occupationalDoctorAdvice;
+  final Map<String, String> extraFields;
 
   String get workplace => siteConcerned;
 
@@ -216,6 +218,8 @@ class DocumentFormData {
       'presentToCppt': presentToCppt,
       'externalServiceValidation': externalServiceValidation,
       'occupationalDoctorAdvice': occupationalDoctorAdvice,
+      'extraFields': extraFields,
+      ...extraFields,
     };
   }
 }

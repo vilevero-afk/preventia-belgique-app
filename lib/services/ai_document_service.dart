@@ -8,11 +8,23 @@ import '../models/generation_source.dart';
 import '../models/document_form_data.dart';
 import 'app_config_service.dart';
 
+class AiLinkedDocument {
+  const AiLinkedDocument({required this.title, required this.content});
+
+  final String title;
+  final String content;
+}
+
 class AiDocumentResult {
-  const AiDocumentResult({required this.content, required this.source});
+  const AiDocumentResult({
+    required this.content,
+    required this.source,
+    this.linkedDocuments = const [],
+  });
 
   final String content;
   final GenerationSource source;
+  final List<AiLinkedDocument> linkedDocuments;
 }
 
 class BackendAvailabilityResult {
@@ -150,7 +162,11 @@ class AiDocumentService {
       _debugLog(
         'IA backend generation source=${receivedSource ?? source.value}',
       );
-      return AiDocumentResult(content: document.trim(), source: source);
+      return AiDocumentResult(
+        content: document.trim(),
+        source: source,
+        linkedDocuments: _extractLinkedDocuments(decoded),
+      );
     } on TimeoutException {
       throw const AiDocumentException(
         'Le backend IA met trop de temps à répondre. Vous pouvez réessayer ou utiliser la génération locale.',
@@ -164,6 +180,52 @@ class AiDocumentService {
         'La connexion au backend IA a échoué : ${error.message}',
       );
     }
+  }
+
+  List<AiLinkedDocument> _extractLinkedDocuments(Map<String, dynamic> decoded) {
+    final rawDocuments =
+        decoded['linkedDocuments'] ??
+        decoded['relatedDocuments'] ??
+        decoded['additionalDocuments'] ??
+        decoded['documentsLies'] ??
+        decoded['documentsComplémentaires'];
+    if (rawDocuments is! List) {
+      return const [];
+    }
+
+    return rawDocuments
+        .map((rawDocument) {
+          if (rawDocument is String && rawDocument.trim().isNotEmpty) {
+            return AiLinkedDocument(
+              title: 'Document complémentaire',
+              content: rawDocument.trim(),
+            );
+          }
+          if (rawDocument is! Map<String, dynamic>) {
+            return null;
+          }
+          final title =
+              rawDocument['title'] ??
+              rawDocument['documentType'] ??
+              rawDocument['name'] ??
+              rawDocument['titre'];
+          final content =
+              rawDocument['content'] ??
+              rawDocument['document'] ??
+              rawDocument['markdown'] ??
+              rawDocument['texte'];
+          if (content is! String || content.trim().isEmpty) {
+            return null;
+          }
+          return AiLinkedDocument(
+            title: title is String && title.trim().isNotEmpty
+                ? title.trim()
+                : 'Document complémentaire',
+            content: content.trim(),
+          );
+        })
+        .whereType<AiLinkedDocument>()
+        .toList(growable: false);
   }
 
   Uri _parseBackendUri(String backendUrl) {

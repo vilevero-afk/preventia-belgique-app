@@ -109,7 +109,9 @@ class SavedDocument {
 
 enum SavedDocumentLocalType {
   riskAnalysis('analyse_risques'),
-  actionSummary('recapitulatif_actions');
+  actionSummary('recapitulatif_actions'),
+  preventionDocument('document_prevention'),
+  linkedDocument('document_lie');
 
   const SavedDocumentLocalType(this.storageValue);
 

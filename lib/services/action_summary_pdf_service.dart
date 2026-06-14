@@ -10,6 +10,7 @@ import 'pdf_export_service.dart';
 class ActionSummaryPdfTexts {
   factory ActionSummaryPdfTexts.fromLocalizations(AppLocalizations l10n) {
     return ActionSummaryPdfTexts(
+      languageCode: l10n.localeName,
       title: l10n.actionSummary,
       status: l10n.projectToValidate,
       statusLabel: l10n.status(''),
@@ -54,6 +55,7 @@ class ActionSummaryPdfTexts {
   }
 
   const ActionSummaryPdfTexts({
+    required this.languageCode,
     required this.title,
     required this.status,
     required this.statusLabel,
@@ -96,6 +98,7 @@ class ActionSummaryPdfTexts {
     required this.proofConcreteExamples,
   });
 
+  final String languageCode;
   final String title;
   final String status;
   final String statusLabel;
@@ -144,7 +147,12 @@ class ActionSummaryPdfService {
     required String sourceAnalysisTitle,
     required DateTime generatedAt,
     required ActionSummaryPdfTexts texts,
+    String? referenceNumber,
   }) async {
+    final footerReference = PdfExportService.resolveDocumentReference(
+      metadataDocumentReference: referenceNumber,
+      content: sourceAnalysisTitle,
+    );
     final document = pw.Document(
       title: texts.title,
       author: 'PreventIA Belgique',
@@ -153,20 +161,34 @@ class ActionSummaryPdfService {
     document.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.fromLTRB(32, 32, 32, 40),
+        footer: (context) =>
+            _footer(context, texts.languageCode, footerReference),
         build: (context) => [
           _title('PreventIA Belgique'),
           _subtitle(texts.title),
-          _status(texts.status),
+          _status(texts.status, texts.languageCode),
           pw.SizedBox(height: 12),
-          _info(texts.linkedAnalysis, sourceAnalysisTitle),
-          _info(texts.generatedAt, _formatDate(generatedAt)),
-          _info(texts.source, texts.generatedLocallyFromAnalysis),
-          _info(texts.statusLabel.replaceAll(':', '').trim(), texts.status),
+          _info(texts.linkedAnalysis, sourceAnalysisTitle, texts.languageCode),
+          _info(
+            texts.generatedAt,
+            _formatDate(generatedAt),
+            texts.languageCode,
+          ),
+          _info(
+            texts.source,
+            texts.generatedLocallyFromAnalysis,
+            texts.languageCode,
+          ),
+          _info(
+            texts.statusLabel.replaceAll(':', '').trim(),
+            texts.status,
+            texts.languageCode,
+          ),
           pw.SizedBox(height: 18),
           _section('1. ${texts.summaryObjectiveTitle}', [
             texts.summaryObjectiveText,
-          ]),
+          ], texts.languageCode),
           _actionsSection(summary.priorityActions, texts),
           _documentsSection(summary.documents, texts),
           _actorsSection(summary.actors, texts),
@@ -174,25 +196,55 @@ class ActionSummaryPdfService {
             '5. ${texts.fieldChecks}',
             summary.fieldChecks,
             texts.noFieldChecks,
+            texts.languageCode,
           ),
           _listSection(
             '6. ${texts.expectedProofs}',
             summary.expectedProofs,
             texts.noProofsDetected,
+            texts.languageCode,
           ),
           _section('7. ${texts.usefulExplanations}', [
             texts.advisorMustCheck,
             texts.unverifiedInfoImportance,
             texts.proofConcreteExamples,
-          ]),
+          ], texts.languageCode),
           _section('8. ${texts.validationNoticeTitle}', [
             texts.localValidationNotice,
-          ]),
+          ], texts.languageCode),
         ],
       ),
     );
 
     return document.save();
+  }
+
+  static pw.Widget _footer(
+    pw.Context context,
+    String languageCode,
+    String? referenceNumber,
+  ) {
+    return pw.Container(
+      alignment: pw.Alignment.centerRight,
+      padding: const pw.EdgeInsets.only(top: 6),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          top: pw.BorderSide(color: PdfColor.fromInt(0xffd6dce3)),
+        ),
+      ),
+      child: pw.Text(
+        PdfExportService.documentFooterText(
+          languageCode: languageCode,
+          referenceNumber: referenceNumber,
+          pageNumber: context.pageNumber.toString(),
+          pagesCount: context.pagesCount.toString(),
+        ),
+        style: const pw.TextStyle(
+          color: PdfColor.fromInt(0xff374151),
+          fontSize: 7.5,
+        ),
+      ),
+    );
   }
 
   static String suggestedFileName(DateTime generatedAt) {
@@ -219,21 +271,21 @@ class ActionSummaryPdfService {
     );
   }
 
-  static pw.Widget _status(String text) {
+  static pw.Widget _status(String text, String languageCode) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(top: 4),
       child: pw.Text(
-        _normalizeFrenchText(text),
+        _normalizeFrenchText(text, languageCode),
         style: const pw.TextStyle(fontSize: 11),
       ),
     );
   }
 
-  static pw.Widget _info(String label, String value) {
+  static pw.Widget _info(String label, String value, String languageCode) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 4),
       child: pw.Text(
-        _normalizeFrenchText('$label : $value'),
+        _normalizeFrenchText('$label : $value', languageCode),
         style: const pw.TextStyle(fontSize: 10),
       ),
     );
@@ -244,7 +296,9 @@ class ActionSummaryPdfService {
     ActionSummaryPdfTexts texts,
   ) {
     if (actions.isEmpty) {
-      return _section('2. ${texts.priorityActions}', [texts.noPriorityActions]);
+      return _section('2. ${texts.priorityActions}', [
+        texts.noPriorityActions,
+      ], texts.languageCode);
     }
 
     return _cardsSection(
@@ -260,6 +314,7 @@ class ActionSummaryPdfService {
           '${texts.advisorExpectedShort} : ${texts.advisorMustCheck}',
         ],
       ),
+      languageCode: texts.languageCode,
     );
   }
 
@@ -278,6 +333,7 @@ class ActionSummaryPdfService {
         ],
       ),
       emptyText: texts.noDocumentsDetected,
+      languageCode: texts.languageCode,
     );
   }
 
@@ -295,6 +351,7 @@ class ActionSummaryPdfService {
         ],
       ),
       emptyText: texts.noActorsDetected,
+      languageCode: texts.languageCode,
     );
   }
 
@@ -302,11 +359,16 @@ class ActionSummaryPdfService {
     String title,
     List<String> items,
     String emptyText,
+    String languageCode,
   ) {
-    return _section(title, items.isEmpty ? [emptyText] : items);
+    return _section(title, items.isEmpty ? [emptyText] : items, languageCode);
   }
 
-  static pw.Widget _section(String title, List<String> lines) {
+  static pw.Widget _section(
+    String title,
+    List<String> lines,
+    String languageCode,
+  ) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 14),
       child: pw.Column(
@@ -321,7 +383,7 @@ class ActionSummaryPdfService {
             (line) => pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 4),
               child: pw.Text(
-                _normalizeFrenchText(line),
+                _normalizeFrenchText(line, languageCode),
                 style: const pw.TextStyle(fontSize: 10),
               ),
             ),
@@ -335,10 +397,11 @@ class ActionSummaryPdfService {
     String title,
     Iterable<List<String>> cards, {
     String emptyText = 'Aucun élément détecté automatiquement.',
+    String languageCode = 'fr',
   }) {
     final materialized = cards.toList();
     if (materialized.isEmpty) {
-      return _section(title, [emptyText]);
+      return _section(title, [emptyText], languageCode);
     }
 
     return pw.Padding(
@@ -367,7 +430,7 @@ class ActionSummaryPdfService {
                       (line) => pw.Padding(
                         padding: const pw.EdgeInsets.only(bottom: 3),
                         child: pw.Text(
-                          _normalizeFrenchText(line),
+                          _normalizeFrenchText(line, languageCode),
                           style: const pw.TextStyle(fontSize: 9.5),
                         ),
                       ),
@@ -387,7 +450,10 @@ class ActionSummaryPdfService {
     return '$day/$month/${date.year}';
   }
 
-  static String _normalizeFrenchText(String text) {
+  static String _normalizeFrenchText(
+    String text, [
+    String languageCode = 'fr',
+  ]) {
     return PdfExportService.normalizePdfText(
       text
           .replaceAll('l analyse', 'l’analyse')
@@ -420,6 +486,7 @@ class ActionSummaryPdfService {
           .replaceAll('mise en uvre', 'mise en œuvre')
           .replaceAll('retour d expérience', 'retour d’expérience')
           .replaceAll('Plan Annuel d Action', 'Plan Annuel d’Action'),
+      language: languageCode,
     );
   }
 }

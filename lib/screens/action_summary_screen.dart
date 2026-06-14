@@ -149,6 +149,7 @@ class _ActionSummaryScreenState extends State<ActionSummaryScreen> {
           summary: _summary,
           sourceAnalysisTitle: widget.sourceAnalysisTitle,
           generatedAt: generatedAt,
+          referenceNumber: widget.exportReferenceNumber,
           texts: ActionSummaryPdfTexts.fromLocalizations(
             AppLocalizations.of(context),
           ),

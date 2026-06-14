@@ -1,12 +1,91 @@
 import '../models/analysis_project.dart';
 import '../models/saved_document.dart';
 import 'action_summary_service.dart';
+import 'document_reference_service.dart';
 import 'local_document_storage.dart';
 
 class AnalysisProjectService {
+  Future<AnalysisProject> saveDocumentPackage({
+    required String documentTitle,
+    required String documentContent,
+    String? referenceNumber,
+    required String projectStatus,
+    required String sourceValue,
+    List<LinkedDocumentDraft> linkedDocuments = const [],
+  }) async {
+    final storage = LocalDocumentStorage();
+    final now = DateTime.now();
+    final projectId = now.microsecondsSinceEpoch.toString();
+    final resolvedReferenceNumber = await _resolveReferenceNumber(
+      documentType: documentTitle,
+      referenceNumber: referenceNumber,
+    );
+    final projectName = buildProjectName(
+      analysisTitle: documentTitle,
+      analysisContent: documentContent,
+      referenceNumber: resolvedReferenceNumber,
+      includeDocumentTitle: true,
+    );
+
+    final mainDocument = SavedDocument(
+      id: '${projectId}_main',
+      title: projectName,
+      documentType: documentTitle,
+      content: documentContent,
+      createdAt: now,
+      localDocumentType: SavedDocumentLocalType.preventionDocument,
+      projectId: projectId,
+      status: projectStatus,
+      sourceLabel: sourceValue,
+    );
+
+    final savedLinkedDocuments = linkedDocuments
+        .asMap()
+        .entries
+        .map((entry) {
+          final index = entry.key + 1;
+          final draft = entry.value;
+          return SavedDocument(
+            id: '${projectId}_linked_$index',
+            title: '${draft.title} - $projectName',
+            documentType: draft.title,
+            content: draft.content,
+            createdAt: now,
+            localDocumentType: SavedDocumentLocalType.linkedDocument,
+            sourceDocumentId: mainDocument.id,
+            sourceDocumentTitle: projectName,
+            sourceLabel: sourceValue,
+            status: projectStatus,
+            projectId: projectId,
+          );
+        })
+        .toList(growable: false);
+
+    final project = AnalysisProject(
+      id: projectId,
+      name: projectName,
+      createdAt: now,
+      modifiedAt: now,
+      referenceNumber: resolvedReferenceNumber,
+      analysisTitle: projectName,
+      analysisDocumentId: mainDocument.id,
+      linkedDocumentIds: savedLinkedDocuments.map((doc) => doc.id).toList(),
+      folderType: documentTitle,
+      status: projectStatus,
+    );
+
+    await storage.saveDocument(mainDocument);
+    for (final document in savedLinkedDocuments) {
+      await storage.saveDocument(document);
+    }
+    await storage.saveOrUpdateProject(project);
+    return project;
+  }
+
   Future<AnalysisProject> saveAnalysisWithSummary({
     required String analysisTitle,
     required String analysisContent,
+    String? referenceNumber,
     required String projectStatus,
     required String actionSummaryTitle,
     required String linkedAnalysisLabel,
@@ -20,11 +99,14 @@ class AnalysisProjectService {
     final storage = LocalDocumentStorage();
     final now = DateTime.now();
     final projectId = now.microsecondsSinceEpoch.toString();
-    final referenceNumber = await _nextReferenceNumber(storage, now.year);
+    final resolvedReferenceNumber = await _resolveReferenceNumber(
+      documentType: analysisTitle,
+      referenceNumber: referenceNumber,
+    );
     final projectName = buildProjectName(
       analysisTitle: analysisTitle,
       analysisContent: analysisContent,
-      referenceNumber: referenceNumber,
+      referenceNumber: resolvedReferenceNumber,
     );
 
     final analysisDocument = SavedDocument(
@@ -76,10 +158,11 @@ class AnalysisProjectService {
       name: projectName,
       createdAt: now,
       modifiedAt: now,
-      referenceNumber: referenceNumber,
+      referenceNumber: resolvedReferenceNumber,
       analysisTitle: projectName,
       analysisDocumentId: analysisDocument.id,
       actionSummaryDocumentId: summaryDocument.id,
+      linkedDocumentIds: [summaryDocument.id],
     );
 
     await storage.saveDocument(analysisDocument);
@@ -92,6 +175,7 @@ class AnalysisProjectService {
     required String analysisTitle,
     required String analysisContent,
     required String referenceNumber,
+    bool includeDocumentTitle = false,
   }) {
     final organization = _extractValue(analysisContent, [
       'Nom de l’entreprise',
@@ -120,32 +204,26 @@ class AnalysisProjectService {
       service: service,
       site: site,
     );
-    final parts = [referenceNumber, context ?? analysisTitle];
+    final parts = [
+      referenceNumber,
+      if (includeDocumentTitle) analysisTitle,
+      context ?? (!includeDocumentTitle ? analysisTitle : null),
+    ].whereType<String>();
 
     return _sanitizeProjectName(parts.join(' – '));
   }
 
-  Future<String> _nextReferenceNumber(
-    LocalDocumentStorage storage,
-    int year,
-  ) async {
-    final projects = await storage.loadProjects();
-    var maxNumber = 0;
-    final prefix = 'AR-$year-';
-
-    for (final project in projects) {
-      final reference = project.referenceNumber;
-      if (!reference.startsWith(prefix)) {
-        continue;
-      }
-      final number = int.tryParse(reference.substring(prefix.length));
-      if (number != null && number > maxNumber) {
-        maxNumber = number;
-      }
+  Future<String> _resolveReferenceNumber({
+    required String documentType,
+    required String? referenceNumber,
+  }) async {
+    final referenceService = DocumentReferenceService();
+    final trimmedReference = referenceNumber?.trim();
+    if (trimmedReference != null && trimmedReference.isNotEmpty) {
+      await referenceService.registerReference(trimmedReference);
+      return trimmedReference;
     }
-
-    final next = (maxNumber + 1).toString().padLeft(4, '0');
-    return '$prefix$next';
+    return referenceService.nextReference(documentType: documentType);
   }
 
   String? _bestContext({
@@ -239,6 +317,7 @@ class AnalysisProjectService {
         .replaceAll(RegExp(r'\s+'), ' ')
         .replaceAll(RegExp(r'\s+-\s+'), ' – ')
         .trim();
+    cleaned = cleaned.split(RegExp(r'\s+[\/|]\s+|\s+[–—-]\s+')).first.trim();
     cleaned = cleaned.replaceAll(
       RegExp(r'\s+–\s+ma$', caseSensitive: false),
       '',
@@ -294,4 +373,11 @@ class AnalysisProjectService {
     final month = date.month.toString().padLeft(2, '0');
     return '$day/$month/${date.year}';
   }
+}
+
+class LinkedDocumentDraft {
+  const LinkedDocumentDraft({required this.title, required this.content});
+
+  final String title;
+  final String content;
 }

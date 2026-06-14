@@ -68,6 +68,22 @@ class AppLocalizationsNl extends AppLocalizations {
   String get exportPdf => 'Exporteren als PDF';
 
   @override
+  String get downloadWord => 'Word downloaden';
+
+  @override
+  String get wordDocumentGenerated => 'Word-document gegenereerd';
+
+  @override
+  String get unableToGenerateWordDocument =>
+      'Kan het Word-document niet genereren';
+
+  @override
+  String get exportWord => 'Exporteren naar Word';
+
+  @override
+  String get editableVersion => 'Bewerkbare versie';
+
+  @override
   String get viewActions => 'Acties bekijken';
 
   @override

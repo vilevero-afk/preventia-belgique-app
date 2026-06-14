@@ -216,6 +216,36 @@ abstract class AppLocalizations {
   /// **'Exporter en PDF'**
   String get exportPdf;
 
+  /// No description provided for @downloadWord.
+  ///
+  /// In fr, this message translates to:
+  /// **'Télécharger Word'**
+  String get downloadWord;
+
+  /// No description provided for @wordDocumentGenerated.
+  ///
+  /// In fr, this message translates to:
+  /// **'Document Word généré'**
+  String get wordDocumentGenerated;
+
+  /// No description provided for @unableToGenerateWordDocument.
+  ///
+  /// In fr, this message translates to:
+  /// **'Impossible de générer le document Word'**
+  String get unableToGenerateWordDocument;
+
+  /// No description provided for @exportWord.
+  ///
+  /// In fr, this message translates to:
+  /// **'Exporter en Word'**
+  String get exportWord;
+
+  /// No description provided for @editableVersion.
+  ///
+  /// In fr, this message translates to:
+  /// **'Version modifiable'**
+  String get editableVersion;
+
   /// No description provided for @viewActions.
   ///
   /// In fr, this message translates to:

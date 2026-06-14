@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/localized_strings.dart';
+import '../data/document_examples.dart';
 import '../models/document_form_data.dart';
+import '../models/document_type.dart';
 import '../models/generation_source.dart';
+import '../models/prevention_document_config.dart';
 import '../services/ai_document_service.dart';
 import '../services/app_config_service.dart';
+import '../services/document_reference_service.dart';
 import '../services/document_generator.dart';
 import '../widgets/adaptive_page.dart';
 import 'result_screen.dart';
@@ -21,12 +25,25 @@ class DocumentFormScreen extends StatefulWidget {
 
 class _DocumentFormScreenState extends State<DocumentFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final Map<String, TextEditingController> _controllers = {
-    for (final field in _allFields) field.key: TextEditingController(),
-  };
+  final Map<String, TextEditingController> _controllers = {};
 
   bool _isGenerating = false;
   bool _isGeneratingWithAi = false;
+  String? _currentDocumentReference;
+  Future<void>? _referenceInitialization;
+  late final DocumentType _documentType;
+  late final PreventionDocumentConfig? _preventionConfig;
+
+  @override
+  void initState() {
+    super.initState();
+    _documentType = documentTypeByLabel(widget.documentType);
+    _preventionConfig = preventionDocumentConfigFor(_documentType);
+    for (final field in _currentFields) {
+      _controllers[field.key] = TextEditingController();
+    }
+    _referenceInitialization = _generateAndSetDocumentReference();
+  }
 
   @override
   void dispose() {
@@ -41,6 +58,10 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       return;
     }
 
+    await _ensureDocumentReference();
+    if (!mounted) {
+      return;
+    }
     final data = _buildFormData();
     final l10n = AppLocalizations.of(context);
 
@@ -90,7 +111,11 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         _isGenerating = false;
         _isGeneratingWithAi = false;
       });
-      _openResult(content: result.content, generationSource: result.source);
+      _openResult(
+        content: _contentWithDocumentReference(result.content),
+        generationSource: result.source,
+        linkedDocuments: result.linkedDocuments,
+      );
     } on AiDocumentException catch (error) {
       if (!mounted) {
         return;
@@ -124,10 +149,17 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
   DocumentFormData _buildFormData() {
     String value(String key) {
-      final text = _controllers[key]?.text.trim() ?? '';
-      return text.isEmpty ? DocumentFormData.unknownValue : text;
+      final keys = [key, ...(_valueFallbackKeys[key] ?? const <String>[])];
+      for (final candidateKey in keys) {
+        final text = _controllers[candidateKey]?.text.trim() ?? '';
+        if (text.isNotEmpty) {
+          return text;
+        }
+      }
+      return DocumentFormData.unknownValue;
     }
 
+    final documentReference = _documentReference;
     return DocumentFormData(
       documentType: widget.documentType,
       companyName: value('companyName'),
@@ -194,7 +226,47 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       presentToCppt: value('presentToCppt'),
       externalServiceValidation: value('externalServiceValidation'),
       occupationalDoctorAdvice: value('occupationalDoctorAdvice'),
+      extraFields: {
+        if (_preventionConfig != null)
+          '_localeName': AppLocalizations.of(context).localeName,
+        if (_preventionConfig != null) '_isPreventionDocument': 'true',
+        if (documentReference.isNotEmpty) ...{
+          'documentReference': documentReference,
+          'reference': documentReference,
+          if (_documentType.isRiskAnalysis) 'analysisNumber': documentReference,
+        },
+        for (final field in _currentFields)
+          if (!_riskFieldKeys.contains(field.key)) field.key: value(field.key),
+      },
     );
+  }
+
+  Future<void> _ensureDocumentReference() async {
+    if (_documentReference.isNotEmpty) {
+      return;
+    }
+    final pendingInitialization = _referenceInitialization;
+    if (pendingInitialization != null) {
+      await pendingInitialization;
+      if (_documentReference.isNotEmpty) {
+        return;
+      }
+    }
+    _referenceInitialization = _generateAndSetDocumentReference();
+    await _referenceInitialization;
+  }
+
+  Future<void> _generateAndSetDocumentReference() async {
+    final reference = await DocumentReferenceService().nextReference(
+      documentType: widget.documentType,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _currentDocumentReference = reference;
+      _controllers['documentReference']?.text = reference;
+    });
   }
 
   Future<bool> _showAiFallbackDialog(String message) async {
@@ -221,15 +293,34 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   }
 
   void _fillCompleteExample() {
+    final localeName = AppLocalizations.of(context).localeName;
+    final documentExample = getCompleteExampleForDocument(
+      documentType: widget.documentType,
+      languageCode: localeName,
+    );
+    final example = documentExample.isNotEmpty
+        ? documentExample
+        : getCompleteExampleData(localeName);
+    if (example.isEmpty) {
+      _showMissingExampleError(localeName);
+      return;
+    }
+
     _fillExampleValues(
-      getCompleteExampleData(AppLocalizations.of(context).localeName),
+      example.map((key, value) {
+        return MapEntry(key, value?.toString() ?? '');
+      }),
     );
   }
 
   void _clearForm() {
+    final preservedReference = _documentReference;
     setState(() {
       for (final controller in _controllers.values) {
         controller.clear();
+      }
+      if (preservedReference.isNotEmpty) {
+        _controllers['documentReference']?.text = preservedReference;
       }
     });
   }
@@ -237,6 +328,9 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   void _fillExampleValues(Map<String, String> values) {
     setState(() {
       for (final entry in values.entries) {
+        if (_isReferenceField(entry.key) && _setReferenceOnlyIfEmpty()) {
+          continue;
+        }
         _set(entry.key, entry.value);
       }
     });
@@ -244,6 +338,11 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
   void _set(String key, String value) {
     _controllers[key]?.text = value;
+  }
+
+  bool _setReferenceOnlyIfEmpty() {
+    final controller = _controllers['documentReference'];
+    return controller != null && controller.text.trim().isNotEmpty;
   }
 
   void _openLocalDocument(
@@ -263,13 +362,16 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   void _openResult({
     required String content,
     required GenerationSource generationSource,
+    List<AiLinkedDocument> linkedDocuments = const [],
   }) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ResultScreen(
           documentType: widget.documentType,
-          content: content,
+          content: _contentWithDocumentReference(content),
+          documentReference: _documentReference,
           generationSource: generationSource,
+          linkedDocuments: linkedDocuments,
         ),
       ),
     );
@@ -278,8 +380,11 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final title = _preventionConfig == null
+        ? widget.documentType
+        : localizedDocumentTypeLabel(_documentType, l10n.localeName);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.documentType)),
+      appBar: AppBar(title: Text(title)),
       body: Form(
         key: _formKey,
         child: AdaptivePage(
@@ -308,7 +413,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              ..._sections.map(_buildSection),
+              ..._currentSections.map(_buildSection),
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: _isGenerating ? null : _generateDocument,
@@ -341,6 +446,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
         initiallyExpanded: section.initiallyExpanded,
+        leading: const Icon(Icons.segment_outlined),
         title: Text(_localizedSectionTitle(l10n, section.title)),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         children: [_buildSectionFields(section.fields)],
@@ -349,6 +455,9 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   }
 
   String _localizedSectionTitle(AppLocalizations l10n, String title) {
+    if (_preventionConfig != null) {
+      return localizedPreventionSectionTitle(title, l10n.localeName);
+    }
     if (title.startsWith('A.')) {
       return l10n.formSectionIdentification;
     }
@@ -403,6 +512,10 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   Widget _buildField(_FormFieldDefinition field) {
     final help = _fieldHelp[field.key];
     final l10n = AppLocalizations.of(context);
+    final label = _preventionConfig == null
+        ? l10n.fieldLabel(field.key)
+        : localizedPreventionFieldLabel(field.key, l10n.localeName);
+    final hasHelp = _preventionConfig != null || help != null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -412,21 +525,36 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         maxLines: field.maxLines,
         decoration: InputDecoration(
           border: const OutlineInputBorder(),
-          labelText: l10n.fieldLabel(field.key),
-          suffixIcon: help == null
+          filled: true,
+          labelText: label,
+          suffixIcon: !hasHelp
               ? null
               : IconButton(
                   tooltip: l10n.help,
                   icon: const Icon(Icons.info_outline, size: 20),
-                  onPressed: () =>
-                      _showFieldHelp(l10n.fieldLabel(field.key), help),
+                  onPressed: () => _showFieldHelp(label, help, field.key),
                 ),
         ),
       ),
     );
   }
 
-  Future<void> _showFieldHelp(String fieldLabel, _FieldHelp help) async {
+  Future<void> _showFieldHelp(
+    String fieldLabel,
+    _FieldHelp? help,
+    String fieldKey,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final documentExample = getCompleteExampleForDocument(
+      documentType: widget.documentType,
+      languageCode: l10n.localeName,
+    )[fieldKey]?.toString();
+    final description = _preventionConfig == null
+        ? (help?.description ?? l10n.helpDescription)
+        : localizedPreventionFieldHelp(fieldKey, l10n.localeName);
+    final example = _preventionConfig == null
+        ? (documentExample ?? help?.example ?? l10n.helpExample)
+        : documentExample;
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -436,14 +564,14 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(AppLocalizations.of(context).helpDescription),
+              Text(description),
               const SizedBox(height: 12),
               Text(
                 AppLocalizations.of(context).example,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const SizedBox(height: 4),
-              Text(AppLocalizations.of(context).helpExample),
+              Text(example ?? AppLocalizations.of(context).helpExample),
               const SizedBox(height: 12),
               Text(AppLocalizations.of(context).missingInformationHelp),
             ],
@@ -458,7 +586,82 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       ),
     );
   }
+
+  void _showMissingExampleError(String localeName) {
+    final message = switch (localeName) {
+      'nl' =>
+        'Geen compleet voorbeeld beschikbaar voor dit document of deze taal.',
+      'en' => 'No complete example is available for this document or language.',
+      'de' =>
+        'Für dieses Dokument oder diese Sprache ist kein vollständiges Beispiel verfügbar.',
+      _ =>
+        'Aucun exemple complet n’est disponible pour ce document ou cette langue.',
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  List<_FormSection> get _currentSections {
+    final config = _preventionConfig;
+    if (config == null) {
+      return _sections;
+    }
+    return config.sections
+        .map(
+          (section) => _FormSection(
+            title: section.key,
+            initiallyExpanded: section.initiallyExpanded,
+            fields: section.fields
+                .map(
+                  (field) => _FormFieldDefinition(
+                    field.key,
+                    field.key,
+                    maxLines: field.maxLines,
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
+  }
+
+  List<_FormFieldDefinition> get _currentFields {
+    return _currentSections.expand((section) => section.fields).toList();
+  }
+
+  String get _documentReference {
+    final controllerValue = _controllers['documentReference']?.text.trim();
+    if (controllerValue != null && controllerValue.isNotEmpty) {
+      return controllerValue;
+    }
+    return _currentDocumentReference ?? '';
+  }
+
+  String _contentWithDocumentReference(String content) {
+    final reference = _documentReference;
+    if (reference.isEmpty || content.contains(reference)) {
+      return content;
+    }
+    final normalizedContent = content.trimLeft();
+    return 'Document Reference: $reference\n\n$normalizedContent';
+  }
 }
+
+bool _isReferenceField(String key) {
+  return const {
+    'documentReference',
+    'reference',
+    'analysisNumber',
+    'projectNumber',
+    'internalReference',
+  }.contains(key);
+}
+
+const _valueFallbackKeys = {
+  'author': ['preparedBy'],
+  'visitDate': ['visitDateTime', 'eventDateTime', 'date'],
+};
 
 class _FormSection {
   const _FormSection({
@@ -764,6 +967,7 @@ const _sections = [
     title: 'A. Identification du document',
     initiallyExpanded: true,
     fields: [
+      _FormFieldDefinition('documentReference', 'Référence documentaire'),
       _FormFieldDefinition('companyName', 'Nom de l’entreprise'),
       _FormFieldDefinition('siteConcerned', 'Site concerné'),
       _FormFieldDefinition('serviceConcerned', 'Service concerné'),
@@ -1019,6 +1223,7 @@ const _sections = [
 ];
 
 final _allFields = _sections.expand((section) => section.fields).toList();
+final _riskFieldKeys = _allFields.map((field) => field.key).toSet();
 
 Map<String, String> getCompleteExampleData(String localeName) {
   return switch (localeName) {

@@ -3,15 +3,18 @@ import 'package:flutter/services.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/pdf_texts.dart';
+import '../models/document_family.dart';
 import '../models/analysis_project.dart';
 import '../models/saved_document.dart';
 import '../services/action_summary_pdf_service.dart';
 import '../services/action_summary_service.dart';
+import '../services/docx_export_service.dart';
 import '../services/file_export_service.dart';
 import '../services/local_document_storage.dart';
 import '../services/pdf_delivery_service.dart';
 import '../services/pdf_export_service.dart';
 import '../widgets/adaptive_page.dart';
+import '../widgets/simple_markdown_document_view.dart';
 import 'action_summary_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -44,7 +47,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .expand(
           (project) => [
             project.analysisDocumentId,
-            project.actionSummaryDocumentId,
+            if (project.actionSummaryDocumentId != null)
+              project.actionSummaryDocumentId!,
+            ...project.linkedDocumentIds,
           ],
         )
         .toSet();
@@ -180,8 +185,13 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
       analysis: await storage.findDocumentById(
         widget.project.analysisDocumentId,
       ),
-      summary: await storage.findDocumentById(
-        widget.project.actionSummaryDocumentId,
+      summary: widget.project.actionSummaryDocumentId == null
+          ? null
+          : await storage.findDocumentById(
+              widget.project.actionSummaryDocumentId!,
+            ),
+      linkedDocuments: await Future.wait(
+        widget.project.linkedDocumentIds.map(storage.findDocumentById),
       ),
     );
   }
@@ -199,21 +209,49 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
   Future<void> _exportAnalysis(SavedDocument document) async {
     final generatedAt = DateTime.now();
     final locale = Localizations.localeOf(context);
+    final languageCode = locale.languageCode;
     await PdfDeliveryService.exportPdf(
       context: context,
-      name: FileExportService.riskAnalysisFileName(
+      name: _exportFileNameForDocument(
+        document: document,
         referenceNumber: widget.project.referenceNumber,
-        projectTitle:
-            FileExportService.projectTitleFromContent(document.content) ??
-            widget.project.name,
+        projectTitle: widget.project.name,
+        languageCode: languageCode,
         locale: locale,
       ),
       onLayout: (_) => PdfExportService.buildDocumentPdf(
         documentType: document.documentType,
         content: document.content,
         generatedAt: generatedAt,
+        referenceNumber: widget.project.referenceNumber,
         texts: pdfDocumentTexts(AppLocalizations.of(context)),
       ),
+    );
+  }
+
+  Future<void> _exportAnalysisWord(SavedDocument document) async {
+    final generatedAt = DateTime.now();
+    final locale = Localizations.localeOf(context);
+    final languageCode = locale.languageCode;
+    final l10n = AppLocalizations.of(context);
+    final bytes = DocxExportService.buildRiskAssessmentDocx(
+      documentType: document.documentType,
+      content: document.content,
+      generatedAt: generatedAt,
+      referenceNumber: widget.project.referenceNumber,
+    );
+    await FileExportService.saveDocxBytes(
+      bytes: bytes,
+      suggestedFileName: _exportWordFileNameForDocument(
+        document: document,
+        referenceNumber: widget.project.referenceNumber,
+        projectTitle: widget.project.name,
+        languageCode: languageCode,
+        locale: locale,
+      ),
+      context: context,
+      successMessage: l10n.wordDocumentGenerated,
+      errorMessage: l10n.unableToGenerateWordDocument,
     );
   }
 
@@ -225,15 +263,17 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
       context: context,
       name: FileExportService.actionSummaryFileName(
         referenceNumber: widget.project.referenceNumber,
-        projectTitle:
-            FileExportService.projectTitleFromContent(analysis.content) ??
-            widget.project.name,
+        projectTitle: FileExportService.preferredProjectTitle(
+          projectTitle: widget.project.name,
+          content: analysis.content,
+        ),
         locale: locale,
       ),
       onLayout: (_) => ActionSummaryPdfService.buildPdf(
         summary: summary,
         sourceAnalysisTitle: widget.project.name,
         generatedAt: generatedAt,
+        referenceNumber: widget.project.referenceNumber,
         texts: ActionSummaryPdfTexts.fromLocalizations(
           AppLocalizations.of(context),
         ),
@@ -295,7 +335,11 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
                 Text(l10n.creationDate(_formatDate(widget.project.createdAt))),
                 Text(l10n.status(widget.project.status)),
                 const SizedBox(height: 12),
-                Text(l10n.riskAnalysisAndSummaryFolderInfo),
+                Text(
+                  widget.project.actionSummaryDocumentId == null
+                      ? widget.project.folderType
+                      : l10n.riskAnalysisAndSummaryFolderInfo,
+                ),
                 const SizedBox(height: 16),
                 if (documents?.analysis != null)
                   _ProjectDocumentCard(
@@ -311,6 +355,8 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
                     ),
                     onCopy: () => _copy(documents.analysis!),
                     onExport: () => _exportAnalysis(documents.analysis!),
+                    onExportWord: () =>
+                        _exportAnalysisWord(documents.analysis!),
                   ),
                 if (documents?.summary != null && documents?.analysis != null)
                   _ProjectDocumentCard(
@@ -327,6 +373,29 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
                     onCopy: () => _copy(documents.summary!),
                     onExport: () => _exportSummary(documents.analysis!),
                   ),
+                for (final linkedDocument
+                    in documents?.linkedDocuments.whereType<SavedDocument>() ??
+                        const Iterable<SavedDocument>.empty())
+                  if (linkedDocument.id != documents?.summary?.id)
+                    _ProjectDocumentCard(
+                      title: linkedDocument.documentType,
+                      document: linkedDocument,
+                      onOpen: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => SavedDocumentDetailScreen(
+                            document: linkedDocument,
+                            project: widget.project,
+                          ),
+                        ),
+                      ),
+                      onCopy: () => _copy(linkedDocument),
+                      onExport: () => _exportAnalysis(linkedDocument),
+                      onExportWord:
+                          resolveDocumentFamily(linkedDocument.documentType) ==
+                              DocumentFamily.riskAssessment
+                          ? () => _exportAnalysisWord(linkedDocument)
+                          : null,
+                    ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: _isExportingFolder || documents?.analysis == null
@@ -357,6 +426,7 @@ class _ProjectDocumentCard extends StatelessWidget {
     required this.onOpen,
     required this.onCopy,
     required this.onExport,
+    this.onExportWord,
   });
 
   final String title;
@@ -364,6 +434,7 @@ class _ProjectDocumentCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onCopy;
   final VoidCallback onExport;
+  final VoidCallback? onExportWord;
 
   @override
   Widget build(BuildContext context) {
@@ -388,6 +459,11 @@ class _ProjectDocumentCard extends StatelessWidget {
                   onPressed: onExport,
                   child: Text(l10n.exportPdf),
                 ),
+                if (onExportWord != null)
+                  FilledButton.tonal(
+                    onPressed: onExportWord,
+                    child: Text(l10n.downloadWord),
+                  ),
               ],
             ),
           ],
@@ -398,10 +474,77 @@ class _ProjectDocumentCard extends StatelessWidget {
 }
 
 class _ProjectDocuments {
-  const _ProjectDocuments({required this.analysis, required this.summary});
+  const _ProjectDocuments({
+    required this.analysis,
+    required this.summary,
+    this.linkedDocuments = const [],
+  });
 
   final SavedDocument? analysis;
   final SavedDocument? summary;
+  final List<SavedDocument?> linkedDocuments;
+}
+
+String _exportFileNameForDocument({
+  required SavedDocument document,
+  required String? referenceNumber,
+  required String? projectTitle,
+  required String languageCode,
+  Locale? locale,
+}) {
+  final preferredTitle = FileExportService.preferredProjectTitle(
+    projectTitle: projectTitle,
+    content: document.content,
+  );
+  if (resolveDocumentFamily(document.documentType) ==
+      DocumentFamily.riskAssessment) {
+    return FileExportService.documentFileName(
+      referenceNumber: PdfExportService.resolveDocumentReference(
+        metadataDocumentReference: referenceNumber,
+        content: document.content,
+      ),
+      projectTitle: preferredTitle,
+      documentType: document.documentType,
+      languageCode: languageCode,
+    );
+  }
+  return FileExportService.documentFileName(
+    referenceNumber: referenceNumber,
+    projectTitle: preferredTitle,
+    documentType: document.documentType,
+    languageCode: languageCode,
+  );
+}
+
+String _exportWordFileNameForDocument({
+  required SavedDocument document,
+  required String? referenceNumber,
+  required String? projectTitle,
+  required String languageCode,
+  Locale? locale,
+}) {
+  final preferredTitle = FileExportService.preferredProjectTitle(
+    projectTitle: projectTitle,
+    content: document.content,
+  );
+  if (resolveDocumentFamily(document.documentType) ==
+      DocumentFamily.riskAssessment) {
+    return FileExportService.documentWordFileName(
+      referenceNumber: PdfExportService.resolveDocumentReference(
+        metadataDocumentReference: referenceNumber,
+        content: document.content,
+      ),
+      projectTitle: preferredTitle,
+      documentType: document.documentType,
+      languageCode: languageCode,
+    );
+  }
+  return FileExportService.documentWordFileName(
+    referenceNumber: referenceNumber,
+    projectTitle: preferredTitle,
+    documentType: document.documentType,
+    languageCode: languageCode,
+  );
 }
 
 class SavedDocumentDetailScreen extends StatefulWidget {
@@ -425,6 +568,7 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
   bool _isEditing = false;
   bool _isSaving = false;
   bool _isExportingPdf = false;
+  bool _isExportingWord = false;
 
   @override
   void initState() {
@@ -484,9 +628,11 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
             projectTitle: _exportProjectTitle(project),
             locale: project == null ? null : locale,
           )
-        : FileExportService.riskAnalysisFileName(
+        : _exportFileNameForDocument(
+            document: _document,
             referenceNumber: project?.referenceNumber,
             projectTitle: _exportProjectTitle(project),
+            languageCode: locale.languageCode,
             locale: project == null ? null : locale,
           );
 
@@ -498,6 +644,7 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
           documentType: _document.documentType,
           content: _document.content,
           generatedAt: generatedAt,
+          referenceNumber: project?.referenceNumber,
           texts: pdfDocumentTexts(AppLocalizations.of(context)),
         ),
       );
@@ -508,9 +655,49 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
     }
   }
 
+  Future<void> _exportWord() async {
+    final project = widget.project;
+    final locale = Localizations.localeOf(context);
+    final l10n = AppLocalizations.of(context);
+    setState(() => _isExportingWord = true);
+    try {
+      final bytes = DocxExportService.buildRiskAssessmentDocx(
+        documentType: _document.documentType,
+        content: _document.content,
+        generatedAt: DateTime.now(),
+        referenceNumber: project?.referenceNumber,
+      );
+      await FileExportService.saveDocxBytes(
+        bytes: bytes,
+        suggestedFileName: _exportWordFileNameForDocument(
+          document: _document,
+          referenceNumber: project?.referenceNumber,
+          projectTitle: _exportProjectTitle(project),
+          languageCode: locale.languageCode,
+          locale: project == null ? null : locale,
+        ),
+        context: context,
+        successMessage: l10n.wordDocumentGenerated,
+        errorMessage: l10n.unableToGenerateWordDocument,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.unableToGenerateWordDocument)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingWord = false);
+      }
+    }
+  }
+
   String? _exportProjectTitle(AnalysisProject? project) {
-    return FileExportService.projectTitleFromContent(_document.content) ??
-        project?.name;
+    return FileExportService.preferredProjectTitle(
+      projectTitle: project?.name,
+      content: _document.content,
+    );
   }
 
   Future<void> _openLinkedSummary() async {
@@ -520,7 +707,7 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
           documentContent: _document.content,
           sourceAnalysisTitle: _document.title,
           sourceDocumentId: _document.id,
-          exportProjectTitle: widget.project?.name,
+          exportProjectTitle: _exportProjectTitle(widget.project),
           exportReferenceNumber: widget.project?.referenceNumber,
         ),
       ),
@@ -648,6 +835,22 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
                           : const Icon(Icons.picture_as_pdf_outlined),
                       label: Text(l10n.exportPdf),
                     ),
+                    if (!_document.isActionSummary &&
+                        resolveDocumentFamily(_document.documentType) ==
+                            DocumentFamily.riskAssessment)
+                      FilledButton.tonalIcon(
+                        onPressed: _isExportingWord ? null : _exportWord,
+                        icon: _isExportingWord
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.description_outlined),
+                        label: Text(l10n.downloadWord),
+                      ),
                   ],
                 ),
               ],
@@ -670,11 +873,8 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
                       ),
                     )
                   : SingleChildScrollView(
-                      child: SelectableText(
-                        _document.content,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(height: 1.35),
+                      child: SimpleMarkdownDocumentView(
+                        content: _document.content,
                       ),
                     ),
             ),

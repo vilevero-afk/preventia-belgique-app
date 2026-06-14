@@ -9,7 +9,9 @@ class AnalysisProject {
     required this.referenceNumber,
     required this.analysisTitle,
     required this.analysisDocumentId,
-    required this.actionSummaryDocumentId,
+    this.actionSummaryDocumentId,
+    this.linkedDocumentIds = const [],
+    this.folderType = 'Dossier d’analyse de risques',
     this.status = 'Projet à valider',
   });
 
@@ -20,7 +22,9 @@ class AnalysisProject {
   final String referenceNumber;
   final String analysisTitle;
   final String analysisDocumentId;
-  final String actionSummaryDocumentId;
+  final String? actionSummaryDocumentId;
+  final List<String> linkedDocumentIds;
+  final String folderType;
   final String status;
 
   Map<String, dynamic> toJson() {
@@ -34,6 +38,8 @@ class AnalysisProject {
       'analysisTitle': analysisTitle,
       'analysisDocumentId': analysisDocumentId,
       'actionSummaryDocumentId': actionSummaryDocumentId,
+      'linkedDocumentIds': linkedDocumentIds,
+      'folderType': folderType,
       'status': status,
     };
   }
@@ -48,7 +54,14 @@ class AnalysisProject {
           json['referenceNumber'] as String? ?? _legacyReference(json),
       analysisTitle: json['analysisTitle'] as String,
       analysisDocumentId: json['analysisDocumentId'] as String,
-      actionSummaryDocumentId: json['actionSummaryDocumentId'] as String,
+      actionSummaryDocumentId: json['actionSummaryDocumentId'] as String?,
+      linkedDocumentIds:
+          (json['linkedDocumentIds'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
+      folderType:
+          json['folderType'] as String? ?? 'Dossier d’analyse de risques',
       status: json['status'] as String? ?? 'Projet à valider',
     );
   }
