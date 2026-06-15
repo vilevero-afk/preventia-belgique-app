@@ -26,6 +26,7 @@ class DocumentFormScreen extends StatefulWidget {
 class _DocumentFormScreenState extends State<DocumentFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  final Set<String> _expandedSectionKeys = {};
 
   bool _isGenerating = false;
   bool _isGeneratingWithAi = false;
@@ -39,6 +40,11 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
     super.initState();
     _documentType = documentTypeByLabel(widget.documentType);
     _preventionConfig = preventionDocumentConfigFor(_documentType);
+    _expandedSectionKeys.addAll(
+      _currentSections
+          .where((section) => section.initiallyExpanded)
+          .map((section) => section.title),
+    );
     for (final field in _currentFields) {
       _controllers[field.key] = TextEditingController();
     }
@@ -442,13 +448,73 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
   Widget _buildSection(_FormSection section) {
     final l10n = AppLocalizations.of(context);
+    final isDesktop = LayoutBreakpoints.isDesktop(context);
+    final isExpanded = _expandedSectionKeys.contains(section.title);
+    const closedBorderColor = Color(0xFFC9DCD8);
+    const openBorderColor = Color(0xFF0F766E);
+    const closedIconColor = Color(0xFF37474F);
+    const openIconColor = Color(0xFF00796B);
+    const titleColor = Color(0xFF143C3A);
+    const openBackgroundColor = Color(0xFFF1FAF7);
+    final borderRadius = BorderRadius.circular(14);
+    final sectionShape = RoundedRectangleBorder(
+      borderRadius: borderRadius,
+      side: BorderSide(
+        color: isExpanded ? openBorderColor : closedBorderColor,
+        width: isExpanded ? 1.4 : 1,
+      ),
+    );
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
+      color: isExpanded ? openBackgroundColor : Colors.white,
+      elevation: isExpanded ? 2 : 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      shadowColor: const Color(0x220F766E),
+      shape: sectionShape,
       child: ExpansionTile(
         initiallyExpanded: section.initiallyExpanded,
-        leading: const Icon(Icons.segment_outlined),
-        title: Text(_localizedSectionTitle(l10n, section.title)),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        backgroundColor: isExpanded ? openBackgroundColor : Colors.white,
+        collapsedBackgroundColor: Colors.white,
+        iconColor: openIconColor,
+        collapsedIconColor: closedIconColor,
+        textColor: titleColor,
+        collapsedTextColor: titleColor,
+        tilePadding: EdgeInsets.symmetric(
+          horizontal: isDesktop ? 18 : 16,
+          vertical: isDesktop ? 8 : 6,
+        ),
+        childrenPadding: EdgeInsets.fromLTRB(
+          isDesktop ? 18 : 16,
+          2,
+          isDesktop ? 18 : 16,
+          isDesktop ? 18 : 14,
+        ),
+        minTileHeight: isDesktop ? 58 : 54,
+        onExpansionChanged: (expanded) {
+          setState(() {
+            if (expanded) {
+              _expandedSectionKeys.add(section.title);
+            } else {
+              _expandedSectionKeys.remove(section.title);
+            }
+          });
+        },
+        leading: Icon(
+          Icons.segment_outlined,
+          color: isExpanded ? openIconColor : closedIconColor,
+          size: isDesktop ? 25 : 24,
+        ),
+        title: Text(
+          _localizedSectionTitle(l10n, section.title),
+          softWrap: true,
+          style: TextStyle(
+            color: titleColor,
+            fontSize: isDesktop ? 16.5 : 15.5,
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+          ),
+        ),
         children: [_buildSectionFields(section.fields)],
       ),
     );

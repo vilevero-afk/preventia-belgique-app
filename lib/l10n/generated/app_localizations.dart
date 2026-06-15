@@ -120,6 +120,18 @@ abstract class AppLocalizations {
   /// **'Nouveau document'**
   String get newDocument;
 
+  /// No description provided for @riskAssessment.
+  ///
+  /// In fr, this message translates to:
+  /// **'Analyse de risques'**
+  String get riskAssessment;
+
+  /// No description provided for @preventionDocuments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Documents de prévention'**
+  String get preventionDocuments;
+
   /// No description provided for @generalRiskAnalysis.
   ///
   /// In fr, this message translates to:

@@ -97,6 +97,8 @@ class PdfExportService {
   static const _mutedColor = PdfColor.fromInt(0xff5f6b7a);
   static const _borderColor = PdfColor.fromInt(0xffcbd5e1);
   static const _softBackground = PdfColor.fromInt(0xfff8fafc);
+  static const double _tableStartMinFreeSpace = 82;
+  static const double _sectionTableStartMinFreeSpace = 130;
 
   static Future<pw.ThemeData>? _pdfTheme;
 
@@ -105,39 +107,49 @@ class PdfExportService {
       'Identification du document',
       'Contexte et objectif',
       'Références réglementaires belges applicables',
+      'Glossaire des abréviations utilisées',
       'Périmètre de l’analyse',
       'Sources d’information utilisées ou à obtenir',
       'Hypothèses et limites',
       'Description des postes, tâches et travailleurs exposés',
+      'Plan photos',
       'Identification détaillée des dangers',
+      'Méthode de cotation',
       'Tableau principal d’analyse des risques',
       'Analyse des risques résiduels',
       'Priorités d’action',
       'Projet de plan d’action',
-      'Lien avec le Plan Global de Prévention et le Plan Annuel d’Action',
-      'Documents à créer ou mettre à jour',
+      'Lien avec le Plan Annuel d’Action et le Plan Global de Prévention',
+      'Documents à créer ou à mettre à jour',
       'Acteurs à consulter ou à impliquer',
       'Annexes nécessaires',
+      'Limites d’intervention du conseiller en prévention niveau 3',
+      'Points bloquants avant validation',
       'Conclusion',
-      'Mention finale obligatoire',
+      'Mention de validation',
     ],
     'nl': [
       'Identificatie van het document',
       'Context en doelstelling',
-      'Toepasselijke Belgische regelgeving',
+      'Toepasselijke Belgische regelgevende referenties',
+      'Glossarium van gebruikte afkortingen',
       'Afbakening van de analyse',
-      'Gebruikte of te verkrijgen informatiebronnen',
+      'Gebruikte of nog te verkrijgen informatiebronnen',
       'Hypothesen en beperkingen',
       'Beschrijving van functies, taken en blootgestelde werknemers',
-      'Gedetailleerde identificatie van gevaren',
+      'Fotoplan',
+      'Gedetailleerde identificatie van de gevaren',
+      'Beoordelingsmethode',
       'Hoofdtabel van de risicoanalyse',
-      'Analyse van restrisico’s',
-      'Actieprioriteiten',
-      'Ontwerp van actieplan',
-      'Verband met het Globaal Preventieplan en het Jaaractieplan',
-      'Documenten op te stellen of bij te werken',
+      'Analyse van de restrisico’s',
+      'Prioritaire acties',
+      'Ontwerpactieplan',
+      'Verband met het Jaaractieplan en het Globaal Preventieplan',
+      'Documenten die moeten worden opgesteld of bijgewerkt',
       'Te raadplegen of te betrekken actoren',
       'Noodzakelijke bijlagen',
+      'Grenzen van de tussenkomst van de preventieadviseur niveau 3',
+      'Blokkerende punten vóór validatie',
       'Conclusie',
       'Validatievermelding',
     ],
@@ -145,41 +157,51 @@ class PdfExportService {
       'Document identification',
       'Context and objective',
       'Applicable Belgian regulatory references',
+      'Glossary of abbreviations used',
       'Scope of the assessment',
       'Information sources used or to be obtained',
       'Assumptions and limitations',
       'Description of jobs, tasks and exposed workers',
+      'Photo plan',
       'Detailed identification of hazards',
+      'Scoring method',
       'Main risk assessment table',
-      'Residual risk assessment',
+      'Residual risk analysis',
       'Action priorities',
       'Draft action plan',
-      'Link with the Global Prevention Plan and the Annual Action Plan',
+      'Link with the Annual Action Plan and the Global Prevention Plan',
       'Documents to create or update',
-      'Stakeholders to consult or involve',
-      'Required appendices',
+      'Actors to consult or involve',
+      'Required annexes',
+      'Limits of intervention of the level 3 prevention advisor',
+      'Blocking points before validation',
       'Conclusion',
-      'Mandatory final statement',
+      'Validation statement',
     ],
     'de': [
       'Dokumentidentifikation',
       'Kontext und Zielsetzung',
-      'Anwendbare belgische Rechtsvorschriften',
+      'Anwendbare belgische regulatorische Referenzen',
+      'Glossar der verwendeten Abkürzungen',
       'Umfang der Beurteilung',
-      'Verwendete oder noch einzuholende Informationsquellen',
-      'Annahmen und Grenzen',
+      'Verwendete oder noch zu beschaffende Informationsquellen',
+      'Annahmen und Einschränkungen',
       'Beschreibung der Arbeitsplätze, Tätigkeiten und exponierten Beschäftigten',
-      'Detaillierte Ermittlung der Gefährdungen',
+      'Fotoplan',
+      'Detaillierte Identifikation der Gefährdungen',
+      'Bewertungsmethode',
       'Haupttabelle der Gefährdungsbeurteilung',
-      'Beurteilung der Restrisiken',
+      'Analyse der Restrisiken',
       'Handlungsprioritäten',
-      'Entwurf eines Maßnahmenplans',
-      'Verbindung mit dem Globalen Präventionsplan und dem Jährlichen Aktionsplan',
+      'Entwurf des Maßnahmenplans',
+      'Verbindung mit dem Jährlichen Aktionsplan und dem Globalen Präventionsplan',
       'Zu erstellende oder zu aktualisierende Dokumente',
       'Zu konsultierende oder einzubeziehende Akteure',
       'Erforderliche Anhänge',
+      'Grenzen der Mitwirkung des Präventionsberaters Niveau 3',
+      'Blockierende Punkte vor der Validierung',
       'Schlussfolgerung',
-      'Verbindlicher Abschlusshinweis',
+      'Validierungshinweis',
     ],
   };
 
@@ -884,6 +906,7 @@ class PdfExportService {
       languageCode: language,
       documentFamily: DocumentFamily.riskAssessment,
     );
+    final hasBackendHeader = startsWithBackendRiskHeader(content);
     final displayDocumentType = localized.documentTitle;
     final pdfTexts = localizedPdfDocumentTexts(localized.languageCode);
     final footerReference = resolveDocumentReference(
@@ -901,17 +924,24 @@ class PdfExportService {
       language: localized.languageCode,
     );
     final sections = parsed.sections;
+    final mainRiskSection = sections.firstWhere(
+      (section) => _isMainRiskTableSection(section),
+      orElse: () => sections.length >= 12 ? sections[11] : sections.first,
+    );
     final riskRows = _buildRiskRows(
-      _parseMarkdownTable(sections[8].tableRows, language: language),
+      _parseMarkdownTable(mainRiskSection.tableRows, language: language),
     );
 
     final bufferedWidgets = <pw.Widget>[
-      _buildTitleBlock(
-        documentType: displayDocumentType,
-        generatedAt: generatedAt,
-        texts: pdfTexts,
-        language: localized.languageCode,
-      ),
+      if (!hasBackendHeader) ...[
+        _buildTitleBlock(
+          documentType: displayDocumentType,
+          generatedAt: generatedAt,
+          texts: pdfTexts,
+          language: localized.languageCode,
+        ),
+        pw.SizedBox(height: 18),
+      ],
       if (parsed.introLines.isNotEmpty) ...[
         pw.SizedBox(height: 14),
         ..._buildRiskAdvisorParagraphs(
@@ -919,7 +949,6 @@ class PdfExportService {
           localized.languageCode,
         ),
       ],
-      pw.SizedBox(height: 18),
     ];
     var bufferedLandscape = false;
 
@@ -964,11 +993,13 @@ class PdfExportService {
       bufferedWidgets.addAll(widgets);
     }
 
-    for (final section in sections.where((section) => section.index < 18)) {
+    for (final section in sections.where(
+      (section) => !_isValidationSectionTitle(section.title),
+    )) {
       final isLandscape = _sectionNeedsLandscapeInPdf(section);
       addSectionWidgets(
         isLandscape,
-        section.index == 9
+        _isMainRiskTableSection(section)
             ? _buildRiskSection(section, riskRows, localized.languageCode)
             : _buildSection(
                 section,
@@ -1100,25 +1131,48 @@ class PdfExportService {
       languageCode: language,
     );
     final widgets = <pw.Widget>[
+      if (section.tableRows.isNotEmpty) _buildSectionTableStartGuard(),
       _buildSectionTitle('${section.index}. ${section.title}'),
     ];
     final contentWidgets = <pw.Widget>[];
 
-    contentWidgets.addAll(
-      _buildRiskAdvisorParagraphs(sectionContent.split('\n'), language),
-    );
-    if (section.tableRows.isNotEmpty) {
-      if (forceWideTables) {
-        final table = _buildGenericTable(section.tableRows, language);
-        if (table != null) {
-          contentWidgets.add(table);
+    if (section.blocks.isEmpty) {
+      contentWidgets.addAll(
+        _buildRiskAdvisorParagraphs(sectionContent.split('\n'), language),
+      );
+    } else {
+      for (final block in section.blocks) {
+        final text = block.text;
+        final tableRows = block.tableRows;
+        if (text != null) {
+          final cleaned = stripDuplicatedValidationHeading(
+            sectionTitle: section.title,
+            sectionContent: text,
+            languageCode: language,
+          );
+          contentWidgets.addAll(
+            _buildRiskAdvisorParagraphs(cleaned.split('\n'), language),
+          );
+          continue;
         }
-      } else if (section.index == 12) {
-        contentWidgets.addAll(_buildActionPlan(section.tableRows, language));
-      } else {
-        final table = _buildGenericTable(section.tableRows, language);
-        if (table != null) {
-          contentWidgets.add(table);
+        if (tableRows == null || tableRows.isEmpty) {
+          continue;
+        }
+        if (forceWideTables) {
+          final table = _buildGenericTable(tableRows, language);
+          if (table != null) {
+            contentWidgets.add(_buildTableStartGuard());
+            contentWidgets.add(table);
+          }
+        } else if (section.index == 15) {
+          contentWidgets.add(_buildTableStartGuard());
+          contentWidgets.addAll(_buildActionPlan(tableRows, language));
+        } else {
+          final table = _buildGenericTable(tableRows, language);
+          if (table != null) {
+            contentWidgets.add(_buildTableStartGuard());
+            contentWidgets.add(table);
+          }
         }
       }
     }
@@ -1147,7 +1201,7 @@ class PdfExportService {
   }
 
   static bool _sectionNeedsLandscapeInPdf(_DocumentSection section) {
-    if (section.index == 9) {
+    if (section.index == 9 || _isMainRiskTableSection(section)) {
       return true;
     }
     if (section.tableRows.isEmpty) {
@@ -1185,6 +1239,17 @@ class PdfExportService {
     }.contains(normalizedTitle);
   }
 
+  static bool _isMainRiskTableSection(_DocumentSection section) {
+    final normalizedTitle = _normalizeTitle(section.title);
+    return section.index == 12 ||
+        {
+          _normalizeTitle('Tableau principal d’analyse des risques'),
+          _normalizeTitle('Main risk assessment table'),
+          _normalizeTitle('Hoofdtabel van de risicoanalyse'),
+          _normalizeTitle('Haupttabelle der Gefährdungsbeurteilung'),
+        }.contains(normalizedTitle);
+  }
+
   static List<pw.Widget> _buildPreventionSection(
     _DocumentSection section, {
     required DocumentFamily family,
@@ -1196,6 +1261,7 @@ class PdfExportService {
       languageCode: language,
     );
     final widgets = <pw.Widget>[
+      if (section.tableRows.isNotEmpty) _buildSectionTableStartGuard(),
       _buildSectionTitle('${section.index}. ${section.title}'),
     ];
     final contentWidgets = <pw.Widget>[
@@ -1204,10 +1270,12 @@ class PdfExportService {
 
     if (section.tableRows.isNotEmpty) {
       if (family == DocumentFamily.annualActionPlan && section.index == 6) {
+        contentWidgets.add(_buildTableStartGuard());
         contentWidgets.addAll(
           _buildAnnualActionPlanTable(section.tableRows, language),
         );
       } else {
+        contentWidgets.add(_buildTableStartGuard());
         contentWidgets.addAll(_buildReadableTable(section.tableRows, language));
       }
     }
@@ -1234,12 +1302,41 @@ class PdfExportService {
     List<_RiskRow> riskRows,
     String language,
   ) {
+    if (section.blocks.where((block) => block.tableRows != null).length > 1) {
+      final widgets = <pw.Widget>[
+        _buildSectionTableStartGuard(),
+        _buildSectionTitle('${section.index}. ${section.title}'),
+      ];
+      for (final block in section.blocks) {
+        final text = block.text;
+        final tableRows = block.tableRows;
+        if (text != null) {
+          widgets.addAll(
+            _buildRiskAdvisorParagraphs(text.split('\n'), language),
+          );
+          continue;
+        }
+        if (tableRows == null || tableRows.isEmpty) {
+          continue;
+        }
+        final table = _buildGenericTable(tableRows, language);
+        if (table != null) {
+          widgets
+            ..add(_buildTableStartGuard())
+            ..add(table);
+        }
+      }
+      return widgets;
+    }
+
     if (riskRows.isEmpty ||
         _isPlaceholderRiskTable(riskRows) ||
         riskRows.every((risk) => _riskConcern(risk).trim().isEmpty)) {
       final rawTable = _buildGenericTable(section.tableRows, language);
       return [
+        _buildSectionTableStartGuard(),
         _buildSectionTitle('${section.index}. ${section.title}'),
+        if (rawTable != null) _buildTableStartGuard(),
         if (rawTable != null)
           rawTable
         else
@@ -1249,11 +1346,14 @@ class PdfExportService {
 
     final mainRiskTable = _buildMainRiskTable(section.tableRows, language);
     return [
+      _buildSectionTableStartGuard(),
       _buildSectionTitle('${section.index}. ${section.title}'),
       if (mainRiskTable != null)
         ...mainRiskTable
-      else
+      else ...[
+        _buildTableStartGuard(),
         _buildRiskSummaryTable(riskRows, language),
+      ],
     ];
   }
 
@@ -1286,9 +1386,11 @@ class PdfExportService {
       return null;
     }
     return [
+      _buildTableStartGuard(),
       _buildSubsectionLabel(_mainRiskSplitTitle(language, firstPart: true)),
       leftTable,
       pw.SizedBox(height: 8),
+      _buildTableStartGuard(),
       _buildSubsectionLabel(_mainRiskSplitTitle(language, firstPart: false)),
       rightTable,
     ];
@@ -1906,6 +2008,9 @@ class PdfExportService {
       family: family,
       language: language,
     );
+    if (family == DocumentFamily.riskAssessment) {
+      normalized = removeDuplicateLeadingReferenceDate(normalized);
+    }
     normalized = _stripLeadingDuplicatedDocumentTitle(
       normalized,
       family: family,
@@ -2207,6 +2312,9 @@ class PdfExportService {
     if (family != DocumentFamily.riskAssessment) {
       return input;
     }
+    if (startsWithBackendRiskHeader(input)) {
+      return input;
+    }
     final lines = input.replaceAll('\r\n', '\n').split('\n');
     var index = 0;
     while (index < lines.length && lines[index].trim().isEmpty) {
@@ -2247,6 +2355,116 @@ class PdfExportService {
     'Gefährdungsbeurteilung – Entwurf zur Anpassung und Validierung',
     'Gefährdungsbeurteilung – Zu validierender Entwurf',
   ];
+
+  static String removeDuplicateLeadingReferenceDate(String markdown) {
+    final lineEnding = markdown.contains('\r\n') ? '\r\n' : '\n';
+    final lines = markdown.replaceAll('\r\n', '\n').split('\n');
+    var index = 0;
+    while (index < lines.length && lines[index].trim().isEmpty) {
+      index++;
+    }
+    if (index >= lines.length) {
+      return markdown;
+    }
+
+    final startsWithRiskTitle = _isRedundantRiskAssessmentTitle(
+      lines[index].trim(),
+      'fr',
+    );
+    var firstBlockStart = startsWithRiskTitle ? index + 1 : index;
+    var firstBlock = _readLeadingReferenceDateBlock(lines, firstBlockStart);
+    if (firstBlock == null && index + 1 < lines.length) {
+      firstBlockStart = index + 1;
+      firstBlock = _readLeadingReferenceDateBlock(lines, firstBlockStart);
+    }
+    if (firstBlock == null) {
+      return markdown;
+    }
+    var secondStart = firstBlock.endExclusive;
+    while (secondStart < lines.length && lines[secondStart].trim().isEmpty) {
+      secondStart++;
+    }
+    final secondBlock = _readLeadingReferenceDateBlock(lines, secondStart);
+    if (secondBlock == null || !firstBlock.matches(secondBlock)) {
+      return markdown;
+    }
+
+    lines.removeRange(secondStart, secondBlock.endExclusive);
+    while (secondStart < lines.length && lines[secondStart].trim().isEmpty) {
+      lines.removeAt(secondStart);
+    }
+    return lines.join(lineEnding);
+  }
+
+  static _LeadingReferenceDateBlock? _readLeadingReferenceDateBlock(
+    List<String> lines,
+    int start,
+  ) {
+    var index = start;
+    while (index < lines.length && lines[index].trim().isEmpty) {
+      index++;
+    }
+    if (index + 1 >= lines.length) {
+      return null;
+    }
+    final referenceLine = lines[index].trim();
+    final dateLine = lines[index + 1].trim();
+    final referenceValue = _rawReferenceLineValue(referenceLine);
+    final dateValue = _rawDateLineValue(dateLine);
+    if (referenceValue == null || dateValue == null) {
+      return null;
+    }
+    return _LeadingReferenceDateBlock(
+      normalizedReferenceLine: _normalizeTitle(referenceLine),
+      normalizedDateLine: _normalizeTitle(dateLine),
+      referenceValue: _normalizeTitle(referenceValue),
+      dateValue: _normalizeTitle(dateValue),
+      endExclusive: index + 2,
+    );
+  }
+
+  static String? _rawReferenceLineValue(String line) {
+    return RegExp(
+      r'^\s*(?:Référence|Reference|Referentie|Referenz)\s*[:：]\s*(.+?)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line)?.group(1);
+  }
+
+  static String? _rawDateLineValue(String line) {
+    return RegExp(
+      r'^\s*(?:Date|Datum)\s*[:：]\s*(.+?)\s*$',
+      caseSensitive: false,
+    ).firstMatch(line)?.group(1);
+  }
+
+  static bool startsWithBackendRiskHeader(String input) {
+    final lines = input
+        .replaceAll('\r\n', '\n')
+        .split('\n')
+        .map((line) => _cleanMarkdownText(line).trim())
+        .where((line) => line.isNotEmpty)
+        .take(5)
+        .toList();
+    if (lines.length < 3 ||
+        !_isRedundantRiskAssessmentTitle(lines.first, 'fr')) {
+      return false;
+    }
+    return _isReferenceLine(lines[1]) && _isDateLine(lines[2]);
+  }
+
+  static bool _isReferenceLine(String line) {
+    final normalized = _normalizeTitle(line);
+    return [
+      'reference',
+      'referentie',
+      'referenz',
+    ].any((label) => normalized.startsWith(label));
+  }
+
+  static bool _isDateLine(String line) {
+    final normalized = _normalizeTitle(line);
+    return normalized.startsWith('date') || normalized.startsWith('datum');
+  }
 
   static String _removeExistingValidationBlocks(
     String input, {
@@ -2569,7 +2787,7 @@ class PdfExportService {
 
       if (currentIndex == 0) {
         introLines.add(cleanedLine);
-      } else if (currentIndex != 18) {
+      } else if (!_isValidationSectionTitle(builders[currentIndex]!.title)) {
         builders[currentIndex]!.addLine(cleanedLine);
       }
     }
@@ -2807,6 +3025,7 @@ class PdfExportService {
       if (tableRows.isEmpty) {
         return;
       }
+      widgets.add(_buildTableStartGuard());
       widgets.addAll(_buildReadableTable(tableRows, language));
       widgets.add(pw.SizedBox(height: 10));
       tableRows.clear();
@@ -2927,6 +3146,9 @@ class PdfExportService {
     if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) {
       return null;
     }
+    if (_isMarkdownSeparatorLine(trimmed)) {
+      return null;
+    }
     return trimmed
         .substring(1, trimmed.length - 1)
         .split('|')
@@ -3012,9 +3234,9 @@ class PdfExportService {
     ).firstMatch(line);
     if (numbered != null) {
       final index = int.tryParse(numbered.group(1)!);
-      if (index != null && index >= 1 && index <= 18) {
+      if (index != null && index >= 1 && index <= sectionTitles.length) {
         final rawTitle = numbered.group(2) ?? '';
-        final title = _displaySectionTitleForIndex(rawTitle, index, language);
+        final title = _cleanSectionDisplayTitle(rawTitle);
         return _SectionInfo(index: index, title: title);
       }
     }
@@ -3039,26 +3261,6 @@ class PdfExportService {
     return null;
   }
 
-  static String _displaySectionTitleForIndex(
-    String title,
-    int index,
-    String language,
-  ) {
-    final sectionTitles =
-        _sectionTitlesByLanguage[language] ?? _sectionTitlesByLanguage['fr']!;
-    final canonicalTitle = _canonicalSectionTitle(title);
-    final canonicalIndex =
-        sectionTitles.indexWhere(
-          (knownTitle) =>
-              _normalizeTitle(knownTitle) == _normalizeTitle(canonicalTitle),
-        ) +
-        1;
-    if (canonicalIndex == index) {
-      return _cleanSectionDisplayTitle(title);
-    }
-    return sectionTitles[index - 1];
-  }
-
   static String _cleanSectionDisplayTitle(String title) {
     final cleaned = _cleanMarkdownText(title).replaceAll(RegExp(r':$'), '');
     return cleaned.trim();
@@ -3068,77 +3270,77 @@ class PdfExportService {
     final normalized = _normalizeTitle(title);
     final aliases = <String, int>{
       _normalizeTitle('Contexte'): 2,
-      _normalizeTitle('Hypothèses utilisées'): 6,
-      _normalizeTitle('Tableau d’analyse des risques'): 9,
-      _normalizeTitle('Priorités d’action'): 11,
-      _normalizeTitle('Documents à créer ou mettre à jour'): 14,
-      _normalizeTitle('Documents à créer ou à mettre à jour'): 14,
-      _normalizeTitle('Points à valider'): 6,
-      _normalizeTitle('Mention de validation'): 18,
-      _normalizeTitle('Mention finale obligatoire'): 18,
+      _normalizeTitle('Hypothèses utilisées'): 7,
+      _normalizeTitle('Tableau d’analyse des risques'): 12,
+      _normalizeTitle('Priorités d’action'): 14,
+      _normalizeTitle('Documents à créer ou mettre à jour'): 17,
+      _normalizeTitle('Documents à créer ou à mettre à jour'): 17,
+      _normalizeTitle('Points à valider'): 21,
+      _normalizeTitle('Mention de validation'): 23,
+      _normalizeTitle('Mention finale obligatoire'): 23,
       _normalizeTitle('Identificatie van het document'): 1,
       _normalizeTitle('Context en doelstelling'): 2,
       _normalizeTitle('Toepasselijke Belgische regelgeving'): 3,
-      _normalizeTitle('Afbakening van de analyse'): 4,
-      _normalizeTitle('Gebruikte of te verkrijgen informatiebronnen'): 5,
-      _normalizeTitle('Hypothesen en beperkingen'): 6,
+      _normalizeTitle('Afbakening van de analyse'): 5,
+      _normalizeTitle('Gebruikte of te verkrijgen informatiebronnen'): 6,
+      _normalizeTitle('Hypothesen en beperkingen'): 7,
       _normalizeTitle(
         'Beschrijving van functies, taken en blootgestelde werknemers',
-      ): 7,
-      _normalizeTitle('Gedetailleerde identificatie van gevaren'): 8,
-      _normalizeTitle('Hoofdtabel van de risicoanalyse'): 9,
-      _normalizeTitle('Analyse van restrisico’s'): 10,
-      _normalizeTitle('Actieprioriteiten'): 11,
-      _normalizeTitle('Ontwerp van actieplan'): 12,
+      ): 8,
+      _normalizeTitle('Gedetailleerde identificatie van gevaren'): 10,
+      _normalizeTitle('Hoofdtabel van de risicoanalyse'): 12,
+      _normalizeTitle('Analyse van restrisico’s'): 13,
+      _normalizeTitle('Actieprioriteiten'): 14,
+      _normalizeTitle('Ontwerp van actieplan'): 15,
       _normalizeTitle(
         'Verband met het Globaal Preventieplan en het Jaaractieplan',
-      ): 13,
-      _normalizeTitle('Documenten op te stellen of bij te werken'): 14,
-      _normalizeTitle('Te raadplegen of te betrekken actoren'): 15,
-      _normalizeTitle('Noodzakelijke bijlagen'): 16,
-      _normalizeTitle('Conclusie'): 17,
-      _normalizeTitle('Validatievermelding'): 18,
+      ): 16,
+      _normalizeTitle('Documenten op te stellen of bij te werken'): 17,
+      _normalizeTitle('Te raadplegen of te betrekken actoren'): 18,
+      _normalizeTitle('Noodzakelijke bijlagen'): 19,
+      _normalizeTitle('Conclusie'): 22,
+      _normalizeTitle('Validatievermelding'): 23,
       _normalizeTitle('Document identification'): 1,
       _normalizeTitle('Context and objective'): 2,
       _normalizeTitle('Applicable Belgian regulatory references'): 3,
-      _normalizeTitle('Scope of the assessment'): 4,
-      _normalizeTitle('Information sources used or to be obtained'): 5,
-      _normalizeTitle('Assumptions and limitations'): 6,
-      _normalizeTitle('Description of jobs, tasks and exposed workers'): 7,
-      _normalizeTitle('Detailed identification of hazards'): 8,
-      _normalizeTitle('Main risk assessment table'): 9,
-      _normalizeTitle('Residual risk assessment'): 10,
-      _normalizeTitle('Action priorities'): 11,
-      _normalizeTitle('Draft action plan'): 12,
+      _normalizeTitle('Scope of the assessment'): 5,
+      _normalizeTitle('Information sources used or to be obtained'): 6,
+      _normalizeTitle('Assumptions and limitations'): 7,
+      _normalizeTitle('Description of jobs, tasks and exposed workers'): 8,
+      _normalizeTitle('Detailed identification of hazards'): 10,
+      _normalizeTitle('Main risk assessment table'): 12,
+      _normalizeTitle('Residual risk assessment'): 13,
+      _normalizeTitle('Action priorities'): 14,
+      _normalizeTitle('Draft action plan'): 15,
       _normalizeTitle(
         'Link with the Global Prevention Plan and the Annual Action Plan',
-      ): 13,
-      _normalizeTitle('Documents to create or update'): 14,
-      _normalizeTitle('Stakeholders to consult or involve'): 15,
-      _normalizeTitle('Required appendices'): 16,
-      _normalizeTitle('Mandatory final statement'): 18,
+      ): 16,
+      _normalizeTitle('Documents to create or update'): 17,
+      _normalizeTitle('Stakeholders to consult or involve'): 18,
+      _normalizeTitle('Required appendices'): 19,
+      _normalizeTitle('Mandatory final statement'): 23,
       _normalizeTitle('Dokumentidentifikation'): 1,
       _normalizeTitle('Anwendbare belgische Rechtsvorschriften'): 3,
-      _normalizeTitle('Umfang der Beurteilung'): 4,
+      _normalizeTitle('Umfang der Beurteilung'): 5,
       _normalizeTitle('Verwendete oder noch einzuholende Informationsquellen'):
-          5,
-      _normalizeTitle('Annahmen und Grenzen'): 6,
+          6,
+      _normalizeTitle('Annahmen und Grenzen'): 7,
       _normalizeTitle(
         'Beschreibung der Arbeitsplätze, Tätigkeiten und exponierten Beschäftigten',
-      ): 7,
-      _normalizeTitle('Detaillierte Ermittlung der Gefährdungen'): 8,
-      _normalizeTitle('Haupttabelle der Gefährdungsbeurteilung'): 9,
-      _normalizeTitle('Beurteilung der Restrisiken'): 10,
-      _normalizeTitle('Handlungsprioritäten'): 11,
-      _normalizeTitle('Entwurf eines Maßnahmenplans'): 12,
+      ): 8,
+      _normalizeTitle('Detaillierte Ermittlung der Gefährdungen'): 10,
+      _normalizeTitle('Haupttabelle der Gefährdungsbeurteilung'): 12,
+      _normalizeTitle('Beurteilung der Restrisiken'): 13,
+      _normalizeTitle('Handlungsprioritäten'): 14,
+      _normalizeTitle('Entwurf eines Maßnahmenplans'): 15,
       _normalizeTitle(
         'Verbindung mit dem Globalen Präventionsplan und dem Jährlichen Aktionsplan',
-      ): 13,
-      _normalizeTitle('Zu erstellende oder zu aktualisierende Dokumente'): 14,
-      _normalizeTitle('Zu konsultierende oder einzubeziehende Akteure'): 15,
-      _normalizeTitle('Erforderliche Anhänge'): 16,
-      _normalizeTitle('Schlussfolgerung'): 17,
-      _normalizeTitle('Verbindlicher Abschlusshinweis'): 18,
+      ): 16,
+      _normalizeTitle('Zu erstellende oder zu aktualisierende Dokumente'): 17,
+      _normalizeTitle('Zu konsultierende oder einzubeziehende Akteure'): 18,
+      _normalizeTitle('Erforderliche Anhänge'): 19,
+      _normalizeTitle('Schlussfolgerung'): 22,
+      _normalizeTitle('Verbindlicher Abschlusshinweis'): 23,
     };
     final aliasIndex = aliases[normalized];
     if (aliasIndex != null) {
@@ -3375,6 +3577,14 @@ class PdfExportService {
         ),
       ),
     );
+  }
+
+  static pw.Widget _buildSectionTableStartGuard() {
+    return pw.NewPage(freeSpace: _sectionTableStartMinFreeSpace);
+  }
+
+  static pw.Widget _buildTableStartGuard() {
+    return pw.NewPage(freeSpace: _tableStartMinFreeSpace);
   }
 
   static pw.Widget _buildValidationNoticeSection(String language) {
@@ -4366,6 +4576,7 @@ class _DocumentSectionBuilder {
   String title;
   final List<String> _bodyLines = [];
   final List<List<String>> _tableRows = [];
+  final List<_DocumentContentBlock> _blocks = [];
 
   void setTitle(String value) {
     if (value.trim().isNotEmpty) {
@@ -4377,12 +4588,18 @@ class _DocumentSectionBuilder {
     final cells = _parseTableLine(line);
     if (cells != null) {
       _tableRows.add(cells);
+      if (_blocks.isNotEmpty && _blocks.last.tableRows != null) {
+        _blocks.last.tableRows!.add(List<String>.of(cells));
+      } else {
+        _blocks.add(_DocumentContentBlock.table([List<String>.of(cells)]));
+      }
       return;
     }
     if (index == 12 && _appendActionTableContinuation(line)) {
       return;
     }
     _bodyLines.add(line);
+    _blocks.add(_DocumentContentBlock.text(line));
   }
 
   bool _appendActionTableContinuation(String line) {
@@ -4396,6 +4613,17 @@ class _DocumentSectionBuilder {
     }
     final targetIndex = lastRow.length > 2 ? 2 : lastRow.length - 1;
     lastRow[targetIndex] = '${lastRow[targetIndex]}\n$cleaned'.trim();
+    final blockRows = _blocks.isNotEmpty ? _blocks.last.tableRows : null;
+    if (blockRows != null && blockRows.isNotEmpty) {
+      final blockLastRow = blockRows.last;
+      if (blockLastRow.isNotEmpty) {
+        final blockTargetIndex = blockLastRow.length > 2
+            ? 2
+            : blockLastRow.length - 1;
+        blockLastRow[blockTargetIndex] =
+            '${blockLastRow[blockTargetIndex]}\n$cleaned'.trim();
+      }
+    }
     return true;
   }
 
@@ -4405,7 +4633,20 @@ class _DocumentSectionBuilder {
       title: title,
       bodyLines: PdfExportService._trimEmptyLines(_bodyLines),
       tableRows: _tableRows,
+      blocks: _trimBlocks(_blocks),
     );
+  }
+
+  List<_DocumentContentBlock> _trimBlocks(List<_DocumentContentBlock> blocks) {
+    var start = 0;
+    var end = blocks.length;
+    while (start < end && (blocks[start].text?.trim().isEmpty ?? false)) {
+      start++;
+    }
+    while (end > start && (blocks[end - 1].text?.trim().isEmpty ?? false)) {
+      end--;
+    }
+    return blocks.sublist(start, end);
   }
 
   List<String>? _parseTableLine(String line) {
@@ -4447,12 +4688,29 @@ class _DocumentSection {
     required this.title,
     required this.bodyLines,
     required this.tableRows,
+    required this.blocks,
   });
 
   final int index;
   final String title;
   final List<String> bodyLines;
   final List<List<String>> tableRows;
+  final List<_DocumentContentBlock> blocks;
+}
+
+class _DocumentContentBlock {
+  const _DocumentContentBlock._({this.text, this.tableRows});
+
+  factory _DocumentContentBlock.text(String text) {
+    return _DocumentContentBlock._(text: text);
+  }
+
+  factory _DocumentContentBlock.table(List<List<String>> rows) {
+    return _DocumentContentBlock._(tableRows: rows);
+  }
+
+  final String? text;
+  final List<List<String>>? tableRows;
 }
 
 class _SectionInfo {
@@ -4490,6 +4748,29 @@ class _RiskRow {
       }
     }
     return '';
+  }
+}
+
+class _LeadingReferenceDateBlock {
+  const _LeadingReferenceDateBlock({
+    required this.normalizedReferenceLine,
+    required this.normalizedDateLine,
+    required this.referenceValue,
+    required this.dateValue,
+    required this.endExclusive,
+  });
+
+  final String normalizedReferenceLine;
+  final String normalizedDateLine;
+  final String referenceValue;
+  final String dateValue;
+  final int endExclusive;
+
+  bool matches(_LeadingReferenceDateBlock other) {
+    return referenceValue == other.referenceValue &&
+            dateValue == other.dateValue ||
+        normalizedReferenceLine == other.normalizedReferenceLine &&
+            normalizedDateLine == other.normalizedDateLine;
   }
 }
 

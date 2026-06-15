@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:preventia_belgique_app/main.dart';
 import 'package:preventia_belgique_app/screens/document_form_screen.dart';
@@ -22,7 +23,15 @@ void main() {
       find.text('Assistant de prévention et bien-être au travail'),
       findsOneWidget,
     );
-    expect(find.text('Nouveau document'), findsOneWidget);
+    expect(find.text('Analyse de risques'), findsOneWidget);
+    expect(find.text('Documents de prévention'), findsOneWidget);
+    expect(find.text('Nouveau document'), findsNothing);
+    expect(find.text('Plan annuel d’action'), findsOneWidget);
+    expect(find.text('Plan global de prévention sur 5 ans'), findsOneWidget);
+    expect(find.text('Rapport de visite sécurité'), findsOneWidget);
+    expect(find.text('Fiche de poste'), findsOneWidget);
+    expect(find.text('Fiche d’instruction sécurité'), findsOneWidget);
+    expect(find.text('Rapport d’accident ou d’incident'), findsOneWidget);
     expect(find.text('Historique'), findsOneWidget);
     expect(find.text('Mentions et limites'), findsOneWidget);
 
@@ -40,7 +49,7 @@ void main() {
       PreventiaBelgiqueApp(localeController: localeController),
     );
 
-    await tester.tap(find.text('Nieuw document'));
+    await tester.tap(find.text('Risicoanalyse'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Algemene risicoanalyse'));
     await tester.pumpAndSettle();
@@ -81,7 +90,7 @@ void main() {
       PreventiaBelgiqueApp(localeController: localeController),
     );
 
-    await tester.tap(find.text('New document'));
+    await tester.tap(find.text('Risk assessment'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('General risk assessment'));
     await tester.pumpAndSettle();
@@ -109,7 +118,7 @@ void main() {
       PreventiaBelgiqueApp(localeController: localeController),
     );
 
-    await tester.tap(find.text('Neues Dokument'));
+    await tester.tap(find.text('Gefährdungsbeurteilung'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Allgemeine Risikoanalyse'));
     await tester.pumpAndSettle();
@@ -124,5 +133,48 @@ void main() {
       find.text('Interner Präventionsberater – Entwurf zu vervollständigen'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('form section headers use readable styling and visible states', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({'selected_locale': 'de'});
+    final localeController = AppLocaleController(AppConfigService());
+    await localeController.load();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      PreventiaBelgiqueApp(localeController: localeController),
+    );
+
+    await tester.tap(find.text('Gefährdungsbeurteilung'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Allgemeine Risikoanalyse'));
+    await tester.pumpAndSettle();
+
+    final sectionTitle = find.text('A. Identifikation des Dokuments');
+    expect(sectionTitle, findsOneWidget);
+
+    final titleText = tester.widget<Text>(sectionTitle);
+    expect(titleText.softWrap, isTrue);
+    expect(titleText.style?.color, const Color(0xFF143C3A));
+    expect(titleText.style?.fontSize, 15.5);
+    expect(titleText.style?.fontWeight, FontWeight.w700);
+
+    Card sectionCard() {
+      return tester.widget<Card>(
+        find.ancestor(of: sectionTitle, matching: find.byType(Card)).first,
+      );
+    }
+
+    expect(sectionCard().color, const Color(0xFFF1FAF7));
+
+    await tester.tap(sectionTitle);
+    await tester.pumpAndSettle();
+
+    expect(sectionCard().color, Colors.white);
   });
 }

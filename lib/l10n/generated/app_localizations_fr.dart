@@ -18,6 +18,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get newDocument => 'Nouveau document';
 
   @override
+  String get riskAssessment => 'Analyse de risques';
+
+  @override
+  String get preventionDocuments => 'Documents de prévention';
+
+  @override
   String get generalRiskAnalysis => 'Analyse de risques générale';
 
   @override

@@ -26,6 +26,9 @@ class DocxExportService {
       documentFamily: DocumentFamily.riskAssessment,
     );
     final language = localized.languageCode;
+    final hasBackendHeader = PdfExportService.startsWithBackendRiskHeader(
+      content,
+    );
     final resolvedReference = PdfExportService.resolveDocumentReference(
       metadataDocumentReference: referenceNumber,
       content: localized.rawMarkdown,
@@ -35,18 +38,23 @@ class DocxExportService {
       footerReferenceNumber: resolvedReference,
     );
 
-    builder.addTitle(localized.documentTitle);
-    if (referenceNumber != null && referenceNumber.trim().isNotEmpty) {
-      builder.addLabelValue(_referenceLabel(language), referenceNumber.trim());
+    if (!hasBackendHeader) {
+      builder.addTitle(localized.documentTitle);
+      if (referenceNumber != null && referenceNumber.trim().isNotEmpty) {
+        builder.addLabelValue(
+          _referenceLabel(language),
+          referenceNumber.trim(),
+        );
+      }
+      builder.addLabelValue(_dateLabel(language), _formatDate(generatedAt));
+      builder.addParagraph('');
     }
-    builder.addLabelValue(_dateLabel(language), _formatDate(generatedAt));
-    builder.addParagraph('');
 
     _appendRiskAssessmentContent(
       builder,
       localized.rawMarkdown,
       language,
-      documentTitle: localized.documentTitle,
+      documentTitle: hasBackendHeader ? '' : localized.documentTitle,
     );
 
     return _OpenXmlPackage(
@@ -75,7 +83,7 @@ class DocxExportService {
     }
 
     for (final section in parsed.sections) {
-      if (section.index == 18) {
+      if (_isValidationSection(section.title)) {
         continue;
       }
       final isLandscape = _sectionNeedsLandscape(section);
@@ -85,26 +93,44 @@ class DocxExportService {
             : _DocxPageOrientation.portrait,
       );
       builder.addHeading('${section.index}. ${section.title}', 2);
-      if (section.bodyLines.isNotEmpty) {
-        _appendMarkdownContent(
-          builder,
-          section.bodyLines.join('\n'),
-          language,
-          documentTitle: documentTitle,
-          appendValidationNotice: false,
-        );
-      }
-      if (section.tableRows.isNotEmpty) {
-        if (section.index == 9 &&
-            _tableColumnCount(section.tableRows) >
-                _mainRiskFirstPartColumnCount) {
-          final parts = _splitMainRiskTable(section.tableRows, language);
-          builder.addHeading(parts.firstTitle, 3);
-          builder.addTable(parts.firstRows, forceWide: true);
-          builder.addHeading(parts.secondTitle, 3);
-          builder.addTable(parts.secondRows, forceWide: true);
-        } else {
-          builder.addTable(section.tableRows, forceWide: isLandscape);
+      if (section.blocks.where((block) => block.tableRows != null).length > 1) {
+        for (final block in section.blocks) {
+          final text = block.text;
+          final tableRows = block.tableRows;
+          if (text != null) {
+            _appendMarkdownContent(
+              builder,
+              text,
+              language,
+              documentTitle: documentTitle,
+              appendValidationNotice: false,
+            );
+          } else if (tableRows != null && tableRows.isNotEmpty) {
+            builder.addTable(tableRows, forceWide: isLandscape);
+          }
+        }
+      } else {
+        if (section.bodyLines.isNotEmpty) {
+          _appendMarkdownContent(
+            builder,
+            section.bodyLines.join('\n'),
+            language,
+            documentTitle: documentTitle,
+            appendValidationNotice: false,
+          );
+        }
+        if (section.tableRows.isNotEmpty) {
+          if (_isMainRiskTableSection(section) &&
+              _tableColumnCount(section.tableRows) >
+                  _mainRiskFirstPartColumnCount) {
+            final parts = _splitMainRiskTable(section.tableRows, language);
+            builder.addHeading(parts.firstTitle, 3);
+            builder.addTable(parts.firstRows, forceWide: true);
+            builder.addHeading(parts.secondTitle, 3);
+            builder.addTable(parts.secondRows, forceWide: true);
+          } else {
+            builder.addTable(section.tableRows, forceWide: isLandscape);
+          }
         }
       }
     }
@@ -147,7 +173,7 @@ class DocxExportService {
       if (cleaned.isEmpty) {
         if (currentIndex == 0) {
           introLines.add(line);
-        } else if (currentIndex != 18) {
+        } else if (!_isValidationSection(builders[currentIndex]!.title)) {
           builders[currentIndex]!.addLine(line);
         }
         continue;
@@ -163,7 +189,8 @@ class DocxExportService {
         continue;
       }
 
-      if (currentIndex == 18) {
+      if (currentIndex != 0 &&
+          _isValidationSection(builders[currentIndex]!.title)) {
         continue;
       }
 
@@ -195,10 +222,7 @@ class DocxExportService {
       final index = int.tryParse(numbered.group(1)!);
       if (index != null && index >= 1 && index <= titles.length) {
         final title = _cleanSectionTitle(numbered.group(2) ?? '');
-        return _RiskSectionInfo(
-          index,
-          _knownRiskSectionTitle(title, language) ? title : titles[index - 1],
-        );
+        return _RiskSectionInfo(index, title);
       }
     }
 
@@ -217,14 +241,34 @@ class DocxExportService {
     return null;
   }
 
-  static bool _knownRiskSectionTitle(String title, String language) {
-    return _riskSectionTitlesByLanguage.values.any(
-      (titles) => titles.any((known) => _sameText(known, title)),
-    );
+  static bool _isValidationSection(String title) {
+    return [
+      'Mention de validation',
+      'Mention finale obligatoire',
+      'Validatievermelding',
+      'Validation Statement',
+      'Validation notice',
+      'Validation statement',
+      'Mandatory final statement',
+      'Validierungshinweis',
+      'Verbindlicher Abschlusshinweis',
+    ].any((knownTitle) => _sameText(knownTitle, title));
+  }
+
+  static bool _isMainRiskTableSection(_RiskSection section) {
+    final normalizedTitle = _normalizeForComparison(section.title);
+    return section.index == 9 ||
+        section.index == 12 ||
+        [
+          'tableau principal d analyse des risques',
+          'main risk assessment table',
+          'hoofdtabel van de risicoanalyse',
+          'haupttabelle der gefahrdungsbeurteilung',
+        ].contains(normalizedTitle);
   }
 
   static bool _sectionNeedsLandscape(_RiskSection section) {
-    if (section.index == 9) {
+    if (section.index == 9 || _isMainRiskTableSection(section)) {
       return true;
     }
     if (section.tableRows.isEmpty) {
@@ -461,7 +505,10 @@ class DocxExportService {
         .split('|')
         .map((cell) => _cleanMarkdownText(cell))
         .toList();
-    if (cells.every((cell) => RegExp(r'^:?-{3,}:?$').hasMatch(cell))) {
+    if (cells.every((cell) {
+      final value = cell.trim();
+      return value.isEmpty || RegExp(r'^:?-{3,}:?$').hasMatch(value);
+    })) {
       return null;
     }
     return cells;
@@ -577,39 +624,49 @@ class DocxExportService {
       'Identification du document',
       'Contexte et objectif',
       'Références réglementaires belges applicables',
+      'Glossaire des abréviations utilisées',
       'Périmètre de l’analyse',
       'Sources d’information utilisées ou à obtenir',
       'Hypothèses et limites',
       'Description des postes, tâches et travailleurs exposés',
+      'Plan photos',
       'Identification détaillée des dangers',
+      'Méthode de cotation',
       'Tableau principal d’analyse des risques',
       'Analyse des risques résiduels',
       'Priorités d’action',
       'Projet de plan d’action',
-      'Lien avec le Plan Global de Prévention et le Plan Annuel d’Action',
-      'Documents à créer ou mettre à jour',
+      'Lien avec le Plan Annuel d’Action et le Plan Global de Prévention',
+      'Documents à créer ou à mettre à jour',
       'Acteurs à consulter ou à impliquer',
       'Annexes nécessaires',
+      'Limites d’intervention du conseiller en prévention niveau 3',
+      'Points bloquants avant validation',
       'Conclusion',
-      'Mention finale obligatoire',
+      'Mention de validation',
     ],
     'nl': [
       'Identificatie van het document',
       'Context en doelstelling',
-      'Toepasselijke Belgische regelgeving',
+      'Toepasselijke Belgische regelgevende referenties',
+      'Glossarium van gebruikte afkortingen',
       'Afbakening van de analyse',
-      'Gebruikte of te verkrijgen informatiebronnen',
+      'Gebruikte of nog te verkrijgen informatiebronnen',
       'Hypothesen en beperkingen',
       'Beschrijving van functies, taken en blootgestelde werknemers',
-      'Gedetailleerde identificatie van gevaren',
+      'Fotoplan',
+      'Gedetailleerde identificatie van de gevaren',
+      'Beoordelingsmethode',
       'Hoofdtabel van de risicoanalyse',
-      'Analyse van restrisico’s',
-      'Actieprioriteiten',
-      'Ontwerp van actieplan',
-      'Verband met het Globaal Preventieplan en het Jaaractieplan',
-      'Documenten op te stellen of bij te werken',
+      'Analyse van de restrisico’s',
+      'Prioritaire acties',
+      'Ontwerpactieplan',
+      'Verband met het Jaaractieplan en het Globaal Preventieplan',
+      'Documenten die moeten worden opgesteld of bijgewerkt',
       'Te raadplegen of te betrekken actoren',
       'Noodzakelijke bijlagen',
+      'Grenzen van de tussenkomst van de preventieadviseur niveau 3',
+      'Blokkerende punten vóór validatie',
       'Conclusie',
       'Validatievermelding',
     ],
@@ -617,41 +674,51 @@ class DocxExportService {
       'Document identification',
       'Context and objective',
       'Applicable Belgian regulatory references',
+      'Glossary of abbreviations used',
       'Scope of the assessment',
       'Information sources used or to be obtained',
       'Assumptions and limitations',
       'Description of jobs, tasks and exposed workers',
+      'Photo plan',
       'Detailed identification of hazards',
+      'Scoring method',
       'Main risk assessment table',
-      'Residual risk assessment',
+      'Residual risk analysis',
       'Action priorities',
       'Draft action plan',
-      'Link with the Global Prevention Plan and the Annual Action Plan',
+      'Link with the Annual Action Plan and the Global Prevention Plan',
       'Documents to create or update',
-      'Stakeholders to consult or involve',
-      'Required appendices',
+      'Actors to consult or involve',
+      'Required annexes',
+      'Limits of intervention of the level 3 prevention advisor',
+      'Blocking points before validation',
       'Conclusion',
-      'Mandatory final statement',
+      'Validation statement',
     ],
     'de': [
       'Dokumentidentifikation',
       'Kontext und Zielsetzung',
-      'Anwendbare belgische Rechtsvorschriften',
+      'Anwendbare belgische regulatorische Referenzen',
+      'Glossar der verwendeten Abkürzungen',
       'Umfang der Beurteilung',
-      'Verwendete oder noch einzuholende Informationsquellen',
-      'Annahmen und Grenzen',
+      'Verwendete oder noch zu beschaffende Informationsquellen',
+      'Annahmen und Einschränkungen',
       'Beschreibung der Arbeitsplätze, Tätigkeiten und exponierten Beschäftigten',
-      'Detaillierte Ermittlung der Gefährdungen',
+      'Fotoplan',
+      'Detaillierte Identifikation der Gefährdungen',
+      'Bewertungsmethode',
       'Haupttabelle der Gefährdungsbeurteilung',
-      'Beurteilung der Restrisiken',
+      'Analyse der Restrisiken',
       'Handlungsprioritäten',
-      'Entwurf eines Maßnahmenplans',
-      'Verbindung mit dem Globalen Präventionsplan und dem Jährlichen Aktionsplan',
+      'Entwurf des Maßnahmenplans',
+      'Verbindung mit dem Jährlichen Aktionsplan und dem Globalen Präventionsplan',
       'Zu erstellende oder zu aktualisierende Dokumente',
       'Zu konsultierende oder einzubeziehende Akteure',
       'Erforderliche Anhänge',
+      'Grenzen der Mitwirkung des Präventionsberaters Niveau 3',
+      'Blockierende Punkte vor der Validierung',
       'Schlussfolgerung',
-      'Verbindlicher Abschlusshinweis',
+      'Validierungshinweis',
     ],
   };
 }
@@ -686,12 +753,14 @@ class _RiskSection {
     required this.title,
     required this.bodyLines,
     required this.tableRows,
+    required this.blocks,
   });
 
   final int index;
   final String title;
   final List<String> bodyLines;
   final List<List<String>> tableRows;
+  final List<_RiskContentBlock> blocks;
 }
 
 class _RiskSectionBuilder {
@@ -701,6 +770,7 @@ class _RiskSectionBuilder {
   String title;
   final List<String> bodyLines = [];
   final List<List<String>> tableRows = [];
+  final List<_RiskContentBlock> blocks = [];
 
   void addLine(String line) {
     final trimmed = line.trim();
@@ -712,9 +782,15 @@ class _RiskSectionBuilder {
     final tableCells = DocxExportService._parseRawTableLine(trimmed);
     if (tableCells != null) {
       tableRows.add(tableCells);
+      if (blocks.isNotEmpty && blocks.last.tableRows != null) {
+        blocks.last.tableRows!.add(List<String>.of(tableCells));
+      } else {
+        blocks.add(_RiskContentBlock.table([List<String>.of(tableCells)]));
+      }
       return;
     }
     bodyLines.add(line);
+    blocks.add(_RiskContentBlock.text(line));
   }
 
   _RiskSection build() {
@@ -723,8 +799,36 @@ class _RiskSectionBuilder {
       title: title,
       bodyLines: DocxExportService._trimEmptyLines(bodyLines),
       tableRows: tableRows,
+      blocks: _trimBlocks(blocks),
     );
   }
+
+  List<_RiskContentBlock> _trimBlocks(List<_RiskContentBlock> value) {
+    var start = 0;
+    var end = value.length;
+    while (start < end && (value[start].text?.trim().isEmpty ?? false)) {
+      start++;
+    }
+    while (end > start && (value[end - 1].text?.trim().isEmpty ?? false)) {
+      end--;
+    }
+    return value.sublist(start, end);
+  }
+}
+
+class _RiskContentBlock {
+  const _RiskContentBlock._({this.text, this.tableRows});
+
+  factory _RiskContentBlock.text(String text) {
+    return _RiskContentBlock._(text: text);
+  }
+
+  factory _RiskContentBlock.table(List<List<String>> rows) {
+    return _RiskContentBlock._(tableRows: rows);
+  }
+
+  final String? text;
+  final List<List<String>>? tableRows;
 }
 
 class _RiskSectionInfo {
@@ -865,7 +969,11 @@ $_body
     );
     for (var rowIndex = 0; rowIndex < visibleRows.length; rowIndex++) {
       final row = visibleRows[rowIndex];
-      final rowPr = rowIndex == 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : '';
+      final rowPr = rowIndex == 0
+          ? '<w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>'
+          : rowIndex == 1
+          ? '<w:trPr><w:cantSplit/></w:trPr>'
+          : '';
       _body.writeln('<w:tr>$rowPr');
       for (var index = 0; index < maxColumns; index++) {
         final rawCell = index < row.length ? row[index] : '';
@@ -879,7 +987,7 @@ $_body
             ? '<w:tcPr><w:tcW w:w="$gridWidth" w:type="dxa"/><w:shd w:val="clear" w:fill="12355B"/></w:tcPr>'
             : '<w:tcPr><w:tcW w:w="$gridWidth" w:type="dxa"/></w:tcPr>';
         _body.writeln(
-          '<w:tc>$tcPr${_paragraph(cell, bold: rowIndex == 0, color: rowIndex == 0 ? 'FFFFFF' : null, fontSize: fontSize)}</w:tc>',
+          '<w:tc>$tcPr${_paragraph(cell, bold: rowIndex == 0, color: rowIndex == 0 ? 'FFFFFF' : null, fontSize: fontSize, keepNext: rowIndex == 0, keepLines: rowIndex <= 1)}</w:tc>',
         );
       }
       _body.writeln('</w:tr>');
@@ -994,14 +1102,18 @@ $_body
     int? boldPrefixLength,
     String? color,
     int? fontSize,
+    bool keepNext = false,
+    bool keepLines = false,
   }) {
     final escaped = _escapeXml(text);
-    final keepNext = style == 'Heading1' || style == 'Heading2'
+    final keepNextXml = keepNext || style == 'Heading1' || style == 'Heading2'
         ? '<w:keepNext/>'
         : '';
-    final pStyle = style == null && keepNext.isEmpty
-        ? ''
-        : '<w:pPr>$keepNext${style == null ? '' : '<w:pStyle w:val="$style"/>'}</w:pPr>';
+    final keepLinesXml = keepLines ? '<w:keepLines/>' : '';
+    final pPr =
+        '$keepNextXml$keepLinesXml'
+        '${style == null ? '' : '<w:pStyle w:val="$style"/>'}';
+    final pStyle = pPr.isEmpty ? '' : '<w:pPr>$pPr</w:pPr>';
     final runProperties = _runProperties(
       bold: bold,
       color: color,

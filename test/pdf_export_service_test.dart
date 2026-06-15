@@ -570,6 +570,11 @@ void main() {
       expect(rawPackage, contains('r:id="rIdFooter1"'));
       expect(
         rawPackage,
+        contains('<w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>'),
+      );
+      expect(rawPackage, contains('<w:keepNext/><w:keepLines/>'));
+      expect(
+        rawPackage,
         contains('Tableau principal A - Évaluation du risque'),
       );
       expect(
@@ -578,6 +583,145 @@ void main() {
       );
       expect(rawPackage, contains('Point bloquant'));
       expect(rawPackage, contains('Avis externe'));
+    });
+
+    test(
+      'keeps backend risk assessment headings and split section 12 tables',
+      () async {
+        final markdown = _backendRiskAssessmentMarkdown();
+        final pdfBytes = await PdfExportService.buildDocumentPdf(
+          documentType: 'Analyse de risques générale',
+          content: markdown,
+          generatedAt: DateTime(2026, 6, 14),
+          referenceNumber: 'AR-2026-TEST',
+        );
+        final docxBytes = DocxExportService.buildRiskAssessmentDocx(
+          documentType: 'Analyse de risques générale',
+          content: markdown,
+          generatedAt: DateTime(2026, 6, 14),
+          languageCode: 'fr',
+          referenceNumber: 'AR-2026-TEST',
+        );
+        final rawPackage = utf8.decode(docxBytes, allowMalformed: true);
+
+        expect(pdfBytes, isNotEmpty);
+        expect(docxBytes, isNotEmpty);
+        expect(rawPackage, contains('4. Glossaire des abréviations utilisées'));
+        expect(rawPackage, contains('9. Plan photos'));
+        expect(rawPackage, contains('11. Méthode de cotation'));
+        expect(
+          rawPackage,
+          contains(
+            '16. Lien avec le Plan Annuel d’Action et le Plan Global de Prévention',
+          ),
+        );
+        expect(
+          rawPackage,
+          contains('17. Documents à créer ou à mettre à jour'),
+        );
+        expect(rawPackage, contains('22. Conclusion'));
+
+        final section121 = rawPackage.indexOf(
+          '12.1 Évaluation initiale des risques',
+        );
+        final initialTable = rawPackage.indexOf('Score initial');
+        final section122 = rawPackage.indexOf(
+          '12.2 Mesures, suivi et validation',
+        );
+        final measuresTable = rawPackage.indexOf('Mesure complémentaire');
+        expect(section121, greaterThanOrEqualTo(0));
+        expect(initialTable, greaterThan(section121));
+        expect(section122, greaterThan(initialTable));
+        expect(measuresTable, greaterThan(section122));
+
+        expect(rawPackage, isNot(contains('4. Périmètre de l’analyse')));
+        expect(
+          rawPackage,
+          isNot(contains('9. Tableau principal d’analyse des risques')),
+        );
+        expect(rawPackage, isNot(contains('11. Priorités d’action')));
+        expect(rawPackage, isNot(contains('16. Annexes nécessaires')));
+        expect(rawPackage, isNot(contains('17. Conclusion')));
+        expect('Référence : AR-2026-TEST'.allMatches(rawPackage), hasLength(1));
+        expect('Date : 14/06/2026'.allMatches(rawPackage), hasLength(1));
+      },
+    );
+
+    test(
+      'keeps mocked section 12 tables separate without adding placeholders',
+      () async {
+        final markdown = _completeBackendRiskAssessmentMarkdown();
+        final pdfBytes = await PdfExportService.buildDocumentPdf(
+          documentType: 'Analyse de risques générale',
+          content: markdown,
+          generatedAt: DateTime(2026, 6, 14),
+          referenceNumber: 'AR-2026-MOCK',
+        );
+        final docxBytes = DocxExportService.buildRiskAssessmentDocx(
+          documentType: 'Analyse de risques générale',
+          content: markdown,
+          generatedAt: DateTime(2026, 6, 14),
+          languageCode: 'fr',
+          referenceNumber: 'AR-2026-MOCK',
+        );
+        final rawPackage = utf8.decode(docxBytes, allowMalformed: true);
+
+        expect(pdfBytes, isNotEmpty);
+        expect(docxBytes, isNotEmpty);
+        expect('Référence : AR-2026-MOCK'.allMatches(rawPackage), hasLength(1));
+        expect('Date : 14/06/2026'.allMatches(rawPackage), hasLength(1));
+        expect(rawPackage, isNot(contains('À compléter')));
+        expect(rawPackage, isNot(contains('To complete')));
+        expect(rawPackage, isNot(contains('Aan te vullen')));
+        expect(rawPackage, isNot(contains('Zu ergänzen')));
+
+        final section121 = rawPackage.indexOf(
+          '12.1 Évaluation initiale des risques',
+        );
+        final firstInitialRow = rawPackage.indexOf('Stockage produits');
+        final secondInitialRow = rawPackage.indexOf('Maintenance convoyeur');
+        final section122 = rawPackage.indexOf(
+          '12.2 Mesures, suivi et validation',
+        );
+        final firstFollowUpRow = rawPackage.indexOf('Créer une zone dédiée');
+        final secondFollowUpRow = rawPackage.indexOf(
+          'Ajouter consignation écrite',
+        );
+
+        expect(section121, greaterThanOrEqualTo(0));
+        expect(firstInitialRow, greaterThan(section121));
+        expect(secondInitialRow, greaterThan(firstInitialRow));
+        expect(section122, greaterThan(secondInitialRow));
+        expect(firstFollowUpRow, greaterThan(section122));
+        expect(secondFollowUpRow, greaterThan(firstFollowUpRow));
+        expect(rawPackage, contains('4. Glossaire des abréviations utilisées'));
+        expect(rawPackage, contains('9. Plan photos'));
+        expect(rawPackage, contains('11. Méthode de cotation'));
+        expect(
+          rawPackage,
+          contains(
+            '16. Lien avec le Plan Annuel d’Action et le Plan Global de Prévention',
+          ),
+        );
+        expect(
+          rawPackage,
+          contains('17. Documents à créer ou à mettre à jour'),
+        );
+      },
+    );
+
+    test('removes a duplicate leading reference/date block only', () {
+      final markdown = _completeBackendRiskAssessmentMarkdown(
+        duplicateReferenceDate: true,
+      );
+      final cleaned = PdfExportService.removeDuplicateLeadingReferenceDate(
+        markdown,
+      );
+
+      expect('Référence : AR-2026-MOCK'.allMatches(cleaned), hasLength(1));
+      expect('Date : 14/06/2026'.allMatches(cleaned), hasLength(1));
+      expect(cleaned, contains('12.1 Évaluation initiale des risques'));
+      expect(cleaned, contains('12.2 Mesures, suivi et validation'));
     });
   });
 }
@@ -648,5 +792,127 @@ String _wideRiskAssessmentMarkdown() {
     '| ${headers.join(' | ')} |',
     '| ${headers.map((_) => '---').join(' | ')} |',
     '| ${values.join(' | ')} |',
+  ].join('\n');
+}
+
+String _backendRiskAssessmentMarkdown() {
+  return [
+    'Analyse de risques – Projet à adapter et à valider',
+    'Référence : AR-2026-TEST',
+    'Date : 14/06/2026',
+    '',
+    '1. Identification du document',
+    'Entreprise test.',
+    '',
+    '4. Glossaire des abréviations utilisées',
+    '',
+    '| Abréviation | Définition |',
+    '| --- | --- |',
+    '| PAA | Plan Annuel d’Action |',
+    '',
+    '5. Périmètre de l’analyse',
+    '',
+    'Périmètre à valider.',
+    '',
+    '9. Plan photos',
+    '',
+    '| Numéro photo | Zone ou tâche |',
+    '| --- | --- |',
+    '| 1 | Local produits inflammables |',
+    '',
+    '11. Méthode de cotation',
+    '',
+    'Score = Gravité x Probabilité x Exposition',
+    '',
+    '12. Tableau principal d’analyse des risques',
+    '',
+    '12.1 Évaluation initiale des risques',
+    '',
+    '| N° | Tâche | Danger | G | P | E | Score initial |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
+    '| 1 | Stockage | Incendie | 3 | 3 | 3 | 27 |',
+    '',
+    '12.2 Mesures, suivi et validation',
+    '',
+    '| N° | Mesure complémentaire | Niveau STOP | Responsable |',
+    '| --- | --- | --- | --- |',
+    '| 1 | Vérifier stockage | Technique | SIPPT |',
+    '',
+    '16. Lien avec le Plan Annuel d’Action et le Plan Global de Prévention',
+    '',
+    '17. Documents à créer ou à mettre à jour',
+    '',
+    '22. Conclusion',
+    '',
+    '23. Mention de validation',
+  ].join('\n');
+}
+
+String _completeBackendRiskAssessmentMarkdown({
+  bool duplicateReferenceDate = false,
+}) {
+  final leadingReferenceDate = [
+    'Référence : AR-2026-MOCK',
+    'Date : 14/06/2026',
+  ];
+  return [
+    'Analyse de risques – Projet à adapter et à valider',
+    ...leadingReferenceDate,
+    if (duplicateReferenceDate) ...leadingReferenceDate,
+    '',
+    '1. Identification du document',
+    'Entreprise test.',
+    '',
+    '4. Glossaire des abréviations utilisées',
+    '',
+    '| Abréviation | Définition |',
+    '| --- | --- |',
+    '| PAA | Plan Annuel d’Action |',
+    '',
+    '9. Plan photos',
+    '',
+    '| Numéro photo | Zone ou tâche |',
+    '| --- | --- |',
+    '| 1 | Local produits inflammables |',
+    '',
+    '11. Méthode de cotation',
+    '',
+    'Score = Gravité x Probabilité x Exposition',
+    '',
+    '12. Tableau principal d’analyse des risques',
+    '',
+    '12.1 Évaluation initiale des risques',
+    '',
+    '| N° | Tâche | Danger | G | P | E | Score initial |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
+    '| 1 | Stockage produits | Incendie | 3 | 3 | 3 | 27 |',
+    '| 2 | Maintenance convoyeur | Coincement | 4 | 2 | 2 | 16 |',
+    '',
+    '12.2 Mesures, suivi et validation',
+    '',
+    '| N° | Mesure complémentaire | Niveau STOP | Responsable |',
+    '| --- | --- | --- | --- |',
+    '| 1 | Créer une zone dédiée | Technique | Responsable maintenance |',
+    '| 2 | Ajouter consignation écrite | Organisation | Conseiller prévention |',
+    '',
+    '14. Analyse des risques résiduels',
+    '',
+    '| N° | Risque | Score résiduel |',
+    '| --- | --- | --- |',
+    '| 1 | Incendie | 9 |',
+    '',
+    '15. Projet de plan d’action',
+    '',
+    '| N° | Mesure proposée | Responsable | Échéance | Statut |',
+    '| --- | --- | --- | --- | --- |',
+    '| 1 | Formaliser le contrôle | Responsable maintenance | 30/06/2026 | Ouvert |',
+    '',
+    '16. Lien avec le Plan Annuel d’Action et le Plan Global de Prévention',
+    '',
+    '17. Documents à créer ou à mettre à jour',
+    '',
+    '22. Conclusion',
+    '',
+    '23. Mention de validation',
   ].join('\n');
 }

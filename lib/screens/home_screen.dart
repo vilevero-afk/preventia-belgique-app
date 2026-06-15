@@ -85,10 +85,19 @@ class HomeScreen extends StatelessWidget {
                               builder: (_) => const DocumentTypeScreen(),
                             ),
                           ),
-                          icon: const Icon(Icons.note_add_outlined),
-                          label: Text(l10n.newDocument),
+                          icon: const Icon(Icons.health_and_safety_outlined),
+                          label: Text(l10n.riskAssessment),
                         ),
                         const SizedBox(height: 20),
+                        Text(
+                          l10n.preventionDocuments,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 12),
                         ...documentTypes
                             .where(isNewPreventionDocument)
                             .map(

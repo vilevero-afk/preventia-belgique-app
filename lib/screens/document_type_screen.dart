@@ -12,15 +12,18 @@ class DocumentTypeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final riskAnalysisTypes = documentTypes
+        .where((type) => type.isRiskAnalysis)
+        .toList();
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.newDocument)),
+      appBar: AppBar(title: Text(l10n.riskAssessment)),
       body: AdaptivePage(
         child: ListView.separated(
           padding: EdgeInsets.zero,
-          itemCount: documentTypes.length,
+          itemCount: riskAnalysisTypes.length,
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
-            final type = documentTypes[index];
+            final type = riskAnalysisTypes[index];
             final title = type.isRiskAnalysis
                 ? (type.label == 'Analyse de risques générale'
                       ? l10n.generalRiskAnalysis

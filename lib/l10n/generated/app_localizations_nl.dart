@@ -18,6 +18,12 @@ class AppLocalizationsNl extends AppLocalizations {
   String get newDocument => 'Nieuw document';
 
   @override
+  String get riskAssessment => 'Risicoanalyse';
+
+  @override
+  String get preventionDocuments => 'Preventiedocumenten';
+
+  @override
   String get generalRiskAnalysis => 'Algemene risicoanalyse';
 
   @override
