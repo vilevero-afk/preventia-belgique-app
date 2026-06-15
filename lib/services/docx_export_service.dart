@@ -25,13 +25,17 @@ class DocxExportService {
       languageCode: detectedLanguage,
       documentFamily: DocumentFamily.riskAssessment,
     );
+    final exportMarkdown =
+        PdfExportService.traceAndRemoveDuplicateLeadingReferenceDateBlock(
+          localized.rawMarkdown,
+        );
     final language = localized.languageCode;
-    final hasBackendHeader = PdfExportService.startsWithBackendRiskHeader(
+    final hasBackendHeader = PdfExportService.hasLeadingReferenceDateBlock(
       content,
     );
     final resolvedReference = PdfExportService.resolveDocumentReference(
       metadataDocumentReference: referenceNumber,
-      content: localized.rawMarkdown,
+      content: exportMarkdown,
     );
     final builder = _DocxDocumentBuilder(
       languageCode: language,
@@ -52,7 +56,7 @@ class DocxExportService {
 
     _appendRiskAssessmentContent(
       builder,
-      localized.rawMarkdown,
+      exportMarkdown,
       language,
       documentTitle: hasBackendHeader ? '' : localized.documentTitle,
     );

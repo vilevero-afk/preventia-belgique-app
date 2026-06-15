@@ -710,18 +710,110 @@ void main() {
       },
     );
 
-    test('removes a duplicate leading reference/date block only', () {
-      final markdown = _completeBackendRiskAssessmentMarkdown(
-        duplicateReferenceDate: true,
-      );
-      final cleaned = PdfExportService.removeDuplicateLeadingReferenceDate(
+    test('removes only the duplicate leading reference/date block', () {
+      final markdown = [
+        'Analyse de risques – Projet à adapter et à valider',
+        'Référence : AR-2026-TEST',
+        'Date : 15/06/2026',
+        'Référence : AR-2026-TEST',
+        'Date : 15/06/2026',
+        '',
+        '1. Identification du document',
+      ].join('\n');
+      final cleaned = PdfExportService.removeDuplicateLeadingReferenceDateBlock(
         markdown,
       );
 
-      expect('Référence : AR-2026-MOCK'.allMatches(cleaned), hasLength(1));
-      expect('Date : 14/06/2026'.allMatches(cleaned), hasLength(1));
-      expect(cleaned, contains('12.1 Évaluation initiale des risques'));
-      expect(cleaned, contains('12.2 Mesures, suivi et validation'));
+      expect('Référence : AR-2026-TEST'.allMatches(cleaned), hasLength(1));
+      expect('Date : 15/06/2026'.allMatches(cleaned), hasLength(1));
+      expect(cleaned, contains('1. Identification du document'));
+    });
+
+    test('keeps table, footer and non-consecutive references', () {
+      final markdown = [
+        'Analyse de risques – Projet à adapter et à valider',
+        'Référence : AR-2026-TEST',
+        'Date : 15/06/2026',
+        '',
+        '1. Identification du document',
+        '| Champ | Valeur |',
+        '| --- | --- |',
+        '| Référence | AR-2026-TEST |',
+        '',
+        'Référence : AR-2026-TEST',
+        'Date : 15/06/2026',
+        '',
+        'Référence AR-2026-TEST — Page 1 / 10',
+      ].join('\n');
+      final cleaned = PdfExportService.removeDuplicateLeadingReferenceDateBlock(
+        markdown,
+      );
+
+      expect(cleaned, equals(markdown));
+      expect(cleaned, contains('| Référence | AR-2026-TEST |'));
+      expect(cleaned, contains('Référence AR-2026-TEST — Page 1 / 10'));
+    });
+
+    test('removes duplicate leading reference/date blocks in FR NL EN DE', () {
+      final cases = [
+        (
+          title: 'Analyse de risques – Projet à adapter et à valider',
+          reference: 'Référence : AR-2026-TEST',
+          date: 'Date : 15/06/2026',
+        ),
+        (
+          title: 'Risicoanalyse – Ontwerp aan te passen en te valideren',
+          reference: 'Referentie : AR-2026-TEST',
+          date: 'Datum : 15/06/2026',
+        ),
+        (
+          title: 'Risk Assessment – Draft to be adapted and validated',
+          reference: 'Reference : AR-2026-TEST',
+          date: 'Date : 15/06/2026',
+        ),
+        (
+          title:
+              'Gefährdungsbeurteilung – Entwurf zur Anpassung und Validierung',
+          reference: 'Referenz : AR-2026-TEST',
+          date: 'Datum : 15/06/2026',
+        ),
+      ];
+
+      for (final item in cases) {
+        final markdown = [
+          item.title,
+          item.reference,
+          item.date,
+          item.reference,
+          item.date,
+          '',
+          '1. Identification du document',
+        ].join('\n');
+        final cleaned =
+            PdfExportService.removeDuplicateLeadingReferenceDateBlock(markdown);
+
+        expect(item.reference.allMatches(cleaned), hasLength(1));
+        expect(item.date.allMatches(cleaned), hasLength(1));
+        expect(cleaned, contains('1. Identification du document'));
+      }
+    });
+
+    test('uses cleaned markdown in Word risk assessment export', () {
+      final markdown = _completeBackendRiskAssessmentMarkdown(
+        duplicateReferenceDate: true,
+      );
+      final bytes = DocxExportService.buildRiskAssessmentDocx(
+        documentType: 'Analyse de risques générale',
+        content: markdown,
+        generatedAt: DateTime(2026, 6, 15),
+        languageCode: 'fr',
+        referenceNumber: 'AR-2026-0029',
+      );
+      final rawPackage = utf8.decode(bytes, allowMalformed: true);
+
+      expect('Référence : AR-2026-MOCK'.allMatches(rawPackage), hasLength(1));
+      expect('Date : 14/06/2026'.allMatches(rawPackage), hasLength(1));
+      expect(rawPackage, contains('Référence AR-2026-0029'));
     });
   });
 }

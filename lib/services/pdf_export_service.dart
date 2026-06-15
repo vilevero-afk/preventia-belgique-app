@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -906,12 +907,15 @@ class PdfExportService {
       languageCode: language,
       documentFamily: DocumentFamily.riskAssessment,
     );
-    final hasBackendHeader = startsWithBackendRiskHeader(content);
+    final exportMarkdown = traceAndRemoveDuplicateLeadingReferenceDateBlock(
+      localized.rawMarkdown,
+    );
+    final hasBackendHeader = hasLeadingReferenceDateBlock(content);
     final displayDocumentType = localized.documentTitle;
     final pdfTexts = localizedPdfDocumentTexts(localized.languageCode);
     final footerReference = resolveDocumentReference(
       metadataDocumentReference: referenceNumber,
-      content: localized.rawMarkdown,
+      content: exportMarkdown,
     );
     final document = pw.Document(
       title: 'PreventIA Belgique - $displayDocumentType',
@@ -920,7 +924,7 @@ class PdfExportService {
       subject: 'Projet de document de prévention',
     );
     final parsed = _splitDocumentIntoSections(
-      localized.rawMarkdown,
+      exportMarkdown,
       language: localized.languageCode,
     );
     final sections = parsed.sections;
@@ -2008,9 +2012,6 @@ class PdfExportService {
       family: family,
       language: language,
     );
-    if (family == DocumentFamily.riskAssessment) {
-      normalized = removeDuplicateLeadingReferenceDate(normalized);
-    }
     normalized = _stripLeadingDuplicatedDocumentTitle(
       normalized,
       family: family,
@@ -2356,7 +2357,31 @@ class PdfExportService {
     'Gefährdungsbeurteilung – Zu validierender Entwurf',
   ];
 
-  static String removeDuplicateLeadingReferenceDate(String markdown) {
+  static String traceAndRemoveDuplicateLeadingReferenceDateBlock(String input) {
+    if (kDebugMode) {
+      debugPrint(
+        '[EXPORT_HEADER_TRACE] before duplicate cleanup:\n'
+        '${_previewForExportHeaderTrace(input)}',
+      );
+    }
+    final cleaned = removeDuplicateLeadingReferenceDateBlock(input);
+    if (kDebugMode) {
+      debugPrint(
+        '[EXPORT_HEADER_TRACE] after duplicate cleanup:\n'
+        '${_previewForExportHeaderTrace(cleaned)}',
+      );
+    }
+    return cleaned;
+  }
+
+  static String _previewForExportHeaderTrace(String input) {
+    final trimmed = input.trimLeft();
+    return trimmed.substring(0, trimmed.length < 500 ? trimmed.length : 500);
+  }
+
+  static String removeDuplicateLeadingReferenceDateBlock(String input) {
+    const scanLineLimit = 15;
+    final markdown = input;
     final lineEnding = markdown.contains('\r\n') ? '\r\n' : '\n';
     final lines = markdown.replaceAll('\r\n', '\n').split('\n');
     var index = 0;
@@ -2367,16 +2392,10 @@ class PdfExportService {
       return markdown;
     }
 
-    final startsWithRiskTitle = _isRedundantRiskAssessmentTitle(
-      lines[index].trim(),
-      'fr',
-    );
-    var firstBlockStart = startsWithRiskTitle ? index + 1 : index;
-    var firstBlock = _readLeadingReferenceDateBlock(lines, firstBlockStart);
-    if (firstBlock == null && index + 1 < lines.length) {
-      firstBlockStart = index + 1;
-      firstBlock = _readLeadingReferenceDateBlock(lines, firstBlockStart);
-    }
+    final firstBlock =
+        _isRedundantRiskAssessmentTitle(lines[index].trim(), 'fr')
+        ? _readLeadingReferenceDateBlock(lines, index + 1)
+        : _readLeadingReferenceDateBlock(lines, index);
     if (firstBlock == null) {
       return markdown;
     }
@@ -2388,12 +2407,34 @@ class PdfExportService {
     if (secondBlock == null || !firstBlock.matches(secondBlock)) {
       return markdown;
     }
+    if (secondBlock.endExclusive > scanLineLimit) {
+      return markdown;
+    }
 
     lines.removeRange(secondStart, secondBlock.endExclusive);
     while (secondStart < lines.length && lines[secondStart].trim().isEmpty) {
       lines.removeAt(secondStart);
     }
     return lines.join(lineEnding);
+  }
+
+  static String removeDuplicateLeadingReferenceDate(String markdown) {
+    return removeDuplicateLeadingReferenceDateBlock(markdown);
+  }
+
+  static bool hasLeadingReferenceDateBlock(String input) {
+    final lines = input.replaceAll('\r\n', '\n').split('\n');
+    var index = 0;
+    while (index < lines.length && lines[index].trim().isEmpty) {
+      index++;
+    }
+    if (index >= lines.length) {
+      return false;
+    }
+    if (_isRedundantRiskAssessmentTitle(lines[index].trim(), 'fr')) {
+      return _readLeadingReferenceDateBlock(lines, index + 1) != null;
+    }
+    return _readLeadingReferenceDateBlock(lines, index) != null;
   }
 
   static _LeadingReferenceDateBlock? _readLeadingReferenceDateBlock(

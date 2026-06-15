@@ -6,9 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/generation_source.dart';
 import '../models/document_form_data.dart';
-import '../models/document_family.dart';
 import 'app_config_service.dart';
-import 'pdf_export_service.dart';
 
 class AiLinkedDocument {
   const AiLinkedDocument({required this.title, required this.content});
@@ -164,7 +162,6 @@ class AiDocumentService {
       _debugLog(
         'IA backend generation source=${receivedSource ?? source.value}',
       );
-      _debugRiskAssessmentExportTrace(data, document);
       return AiDocumentResult(
         content: document.trim(),
         source: source,
@@ -183,38 +180,6 @@ class AiDocumentService {
         'La connexion au backend IA a échoué : ${error.message}',
       );
     }
-  }
-
-  void _debugRiskAssessmentExportTrace(DocumentFormData data, String document) {
-    if (!kDebugMode ||
-        resolveDocumentFamily(data.documentType) !=
-            DocumentFamily.riskAssessment) {
-      return;
-    }
-    final trimmed = document.trim();
-    debugPrint(
-      '[FLUTTER_EXPORT_TRACE] received backend document preview:\n'
-      '${trimmed.substring(0, trimmed.length < 2000 ? trimmed.length : 2000)}',
-    );
-    debugPrint(
-      '[FLUTTER_EXPORT_TRACE] contains duplicate reference date before export: '
-      '${PdfExportService.removeDuplicateLeadingReferenceDate(trimmed) != trimmed}',
-    );
-    debugPrint(
-      '[FLUTTER_EXPORT_TRACE] count "À compléter" before export: '
-      '${_countPlaceholderOccurrences(trimmed)}',
-    );
-    debugPrint(
-      '[FLUTTER_EXPORT_TRACE] count "À compléter" after export parsing: '
-      'not available',
-    );
-  }
-
-  int _countPlaceholderOccurrences(String document) {
-    return RegExp(
-      r'À compléter|To complete|Aan te vullen|Zu ergänzen',
-      caseSensitive: false,
-    ).allMatches(document).length;
   }
 
   List<AiLinkedDocument> _extractLinkedDocuments(Map<String, dynamic> decoded) {
