@@ -7,6 +7,7 @@ import 'package:preventia_belgique_app/models/document_form_data.dart';
 import 'package:preventia_belgique_app/models/generation_source.dart';
 import 'package:preventia_belgique_app/services/ai_document_service.dart';
 import 'package:preventia_belgique_app/services/app_config_service.dart';
+import 'package:preventia_belgique_app/services/license_service.dart';
 
 void main() {
   group('AiDocumentService.isBackendAvailable', () {
@@ -74,9 +75,19 @@ void main() {
     test('sends expected payload and returns ai backend source', () async {
       Uri? requestedUri;
       Map<String, dynamic>? payload;
+      String? authorization;
+      final licenseStorage = _MemoryLicenseStorage();
+      await licenseStorage.write(key: 'license_key', value: 'LIC-TEST');
+      await licenseStorage.write(key: 'authToken', value: 'token-test');
+      await licenseStorage.write(
+        key: 'license_device_id',
+        value: 'device-test',
+      );
       final service = AiDocumentService(
+        licenseService: LicenseService(storage: licenseStorage),
         client: MockClient((request) async {
           requestedUri = request.url;
+          authorization = request.headers['Authorization'];
           payload = jsonDecode(request.body) as Map<String, dynamic>;
           return http.Response(
             jsonEncode({'success': true, 'document': 'Document IA'}),
@@ -96,6 +107,9 @@ void main() {
       expect(payload?['documentType'], 'Analyse de risques générale');
       expect(payload?['language'], 'nl');
       expect(payload?['languageLabel'], 'Nederlands');
+      expect(payload?['licenseKey'], 'LIC-TEST');
+      expect(payload?['deviceId'], 'device-test');
+      expect(authorization, 'Bearer token-test');
       expect(payload?['formData'], isA<Map<String, dynamic>>());
       expect(
         (payload?['formData'] as Map<String, dynamic>)['companyName'],
@@ -104,7 +118,62 @@ void main() {
       expect(result.content, 'Document IA');
       expect(result.source, GenerationSource.aiBackend);
     });
+
+    test('maps backend license errors to a clear message', () async {
+      final licenseStorage = _MemoryLicenseStorage();
+      await licenseStorage.write(key: 'license_key', value: 'LIC-TEST');
+      await licenseStorage.write(
+        key: 'license_device_id',
+        value: 'device-test',
+      );
+      final service = AiDocumentService(
+        licenseService: LicenseService(storage: licenseStorage),
+        client: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'success': false,
+              'code': 'LICENSE_QUOTA_REACHED',
+              'message': 'quota reached',
+            }),
+            200,
+          );
+        }),
+      );
+
+      expect(
+        () => service.generateDocument(
+          backendUrl: AppConfigService.defaultBackendUrl,
+          data: _documentFormData(),
+          languageCode: 'fr',
+          languageLabel: 'Français',
+        ),
+        throwsA(
+          isA<AiDocumentException>().having(
+            (error) => error.message,
+            'message',
+            'Licence requise, expirée ou quota atteint.',
+          ),
+        ),
+      );
+    });
   });
+}
+
+class _MemoryLicenseStorage implements LicenseStorage {
+  final _values = <String, String>{};
+
+  @override
+  Future<String?> read({required String key}) async => _values[key];
+
+  @override
+  Future<void> write({required String key, required String value}) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> delete({required String key}) async {
+    _values.remove(key);
+  }
 }
 
 DocumentFormData _documentFormData() {

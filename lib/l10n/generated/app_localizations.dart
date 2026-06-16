@@ -156,6 +156,210 @@ abstract class AppLocalizations {
   /// **'Paramètres IA'**
   String get aiSettings;
 
+  /// No description provided for @subscriptionLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Abonnement / Licence'**
+  String get subscriptionLicense;
+
+  /// No description provided for @activateLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Activer la licence'**
+  String get activateLicense;
+
+  /// No description provided for @licenseKey.
+  ///
+  /// In fr, this message translates to:
+  /// **'Clé de licence'**
+  String get licenseKey;
+
+  /// No description provided for @activeLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence active'**
+  String get activeLicense;
+
+  /// No description provided for @expiredLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence expirée'**
+  String get expiredLicense;
+
+  /// No description provided for @quotaReached.
+  ///
+  /// In fr, this message translates to:
+  /// **'Quota atteint'**
+  String get quotaReached;
+
+  /// No description provided for @usedDevices.
+  ///
+  /// In fr, this message translates to:
+  /// **'Appareils utilisés'**
+  String get usedDevices;
+
+  /// No description provided for @deactivateThisDevice.
+  ///
+  /// In fr, this message translates to:
+  /// **'Désactiver cet appareil'**
+  String get deactivateThisDevice;
+
+  /// No description provided for @logoutThisDevice.
+  ///
+  /// In fr, this message translates to:
+  /// **'Déconnecter cet appareil'**
+  String get logoutThisDevice;
+
+  /// No description provided for @emailAddress.
+  ///
+  /// In fr, this message translates to:
+  /// **'Adresse e-mail'**
+  String get emailAddress;
+
+  /// No description provided for @password.
+  ///
+  /// In fr, this message translates to:
+  /// **'Mot de passe'**
+  String get password;
+
+  /// No description provided for @signIn.
+  ///
+  /// In fr, this message translates to:
+  /// **'Se connecter'**
+  String get signIn;
+
+  /// No description provided for @personalLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence personnelle'**
+  String get personalLicense;
+
+  /// No description provided for @personalLicenseInfo.
+  ///
+  /// In fr, this message translates to:
+  /// **'Une licence PreventIA est personnelle. Elle est liée à votre adresse e-mail et peut être utilisée sur plusieurs appareils autorisés.'**
+  String get personalLicenseInfo;
+
+  /// No description provided for @primaryLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence principale'**
+  String get primaryLicense;
+
+  /// No description provided for @additionalLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence supplémentaire'**
+  String get additionalLicense;
+
+  /// No description provided for @licenseType.
+  ///
+  /// In fr, this message translates to:
+  /// **'Type de licence'**
+  String get licenseType;
+
+  /// No description provided for @price.
+  ///
+  /// In fr, this message translates to:
+  /// **'Prix'**
+  String get price;
+
+  /// No description provided for @cycle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Cycle'**
+  String get cycle;
+
+  /// No description provided for @monthlyCycle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Cycle mensuel'**
+  String get monthlyCycle;
+
+  /// No description provided for @annualCycle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Cycle annuel'**
+  String get annualCycle;
+
+  /// No description provided for @deviceLimitReached.
+  ///
+  /// In fr, this message translates to:
+  /// **'Limite d’appareils atteinte'**
+  String get deviceLimitReached;
+
+  /// No description provided for @loginRequired.
+  ///
+  /// In fr, this message translates to:
+  /// **'Connexion requise'**
+  String get loginRequired;
+
+  /// No description provided for @loginSuccessful.
+  ///
+  /// In fr, this message translates to:
+  /// **'Connexion réussie'**
+  String get loginSuccessful;
+
+  /// No description provided for @incorrectPassword.
+  ///
+  /// In fr, this message translates to:
+  /// **'Mot de passe incorrect'**
+  String get incorrectPassword;
+
+  /// No description provided for @simpleDocuments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Documents simples'**
+  String get simpleDocuments;
+
+  /// No description provided for @riskAnalyses.
+  ///
+  /// In fr, this message translates to:
+  /// **'Analyses de risques'**
+  String get riskAnalyses;
+
+  /// No description provided for @subscriptionDoesNotAllowDocument.
+  ///
+  /// In fr, this message translates to:
+  /// **'Votre abonnement ne permet pas ce document'**
+  String get subscriptionDoesNotAllowDocument;
+
+  /// No description provided for @noSensitiveHardwareIdentifier.
+  ///
+  /// In fr, this message translates to:
+  /// **'La licence est liée à l’entreprise et à cet appareil. Aucun identifiant matériel sensible n’est collecté.'**
+  String get noSensitiveHardwareIdentifier;
+
+  /// No description provided for @company.
+  ///
+  /// In fr, this message translates to:
+  /// **'Entreprise'**
+  String get company;
+
+  /// No description provided for @plan.
+  ///
+  /// In fr, this message translates to:
+  /// **'Plan'**
+  String get plan;
+
+  /// No description provided for @expirationDate.
+  ///
+  /// In fr, this message translates to:
+  /// **'Date d’expiration'**
+  String get expirationDate;
+
+  /// No description provided for @allowedFeatures.
+  ///
+  /// In fr, this message translates to:
+  /// **'Fonctions autorisées'**
+  String get allowedFeatures;
+
+  /// No description provided for @refresh.
+  ///
+  /// In fr, this message translates to:
+  /// **'Actualiser'**
+  String get refresh;
+
   /// No description provided for @completeFormIntro.
   ///
   /// In fr, this message translates to:

@@ -36,6 +36,111 @@ class AppLocalizationsNl extends AppLocalizations {
   String get aiSettings => 'AI-instellingen';
 
   @override
+  String get subscriptionLicense => 'Abonnement / Licentie';
+
+  @override
+  String get activateLicense => 'Licentie activeren';
+
+  @override
+  String get licenseKey => 'Licentiesleutel';
+
+  @override
+  String get activeLicense => 'Actieve licentie';
+
+  @override
+  String get expiredLicense => 'Verlopen licentie';
+
+  @override
+  String get quotaReached => 'Quota bereikt';
+
+  @override
+  String get usedDevices => 'Gebruikte apparaten';
+
+  @override
+  String get deactivateThisDevice => 'Dit apparaat deactiveren';
+
+  @override
+  String get logoutThisDevice => 'Dit apparaat afmelden';
+
+  @override
+  String get emailAddress => 'E-mailadres';
+
+  @override
+  String get password => 'Wachtwoord';
+
+  @override
+  String get signIn => 'Aanmelden';
+
+  @override
+  String get personalLicense => 'Persoonlijke licentie';
+
+  @override
+  String get personalLicenseInfo =>
+      'Een PreventIA-licentie is persoonlijk. Ze is gekoppeld aan uw e-mailadres en kan op meerdere toegestane apparaten worden gebruikt.';
+
+  @override
+  String get primaryLicense => 'Hoofdlicentie';
+
+  @override
+  String get additionalLicense => 'Aanvullende licentie';
+
+  @override
+  String get licenseType => 'Licentietype';
+
+  @override
+  String get price => 'Prijs';
+
+  @override
+  String get cycle => 'Cyclus';
+
+  @override
+  String get monthlyCycle => 'Maandelijkse cyclus';
+
+  @override
+  String get annualCycle => 'Jaarlijkse cyclus';
+
+  @override
+  String get deviceLimitReached => 'Apparaatlimiet bereikt';
+
+  @override
+  String get loginRequired => 'Aanmelding vereist';
+
+  @override
+  String get loginSuccessful => 'Aanmelding geslaagd';
+
+  @override
+  String get incorrectPassword => 'Onjuist wachtwoord';
+
+  @override
+  String get simpleDocuments => 'Eenvoudige documenten';
+
+  @override
+  String get riskAnalyses => 'Risicoanalyses';
+
+  @override
+  String get subscriptionDoesNotAllowDocument =>
+      'Uw abonnement staat dit document niet toe';
+
+  @override
+  String get noSensitiveHardwareIdentifier =>
+      'De licentie is gekoppeld aan de onderneming en aan dit apparaat. Er wordt geen gevoelige hardware-identificatie verzameld.';
+
+  @override
+  String get company => 'Onderneming';
+
+  @override
+  String get plan => 'Plan';
+
+  @override
+  String get expirationDate => 'Vervaldatum';
+
+  @override
+  String get allowedFeatures => 'Toegestane functies';
+
+  @override
+  String get refresh => 'Vernieuwen';
+
+  @override
   String get completeFormIntro =>
       'Vul de gekende informatie in. Lege velden worden verzonden als \"Niet ingevuld / te controleren\".';
 

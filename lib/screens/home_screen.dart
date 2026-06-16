@@ -9,6 +9,7 @@ import 'ai_settings_screen.dart';
 import 'document_form_screen.dart';
 import 'document_type_screen.dart';
 import 'history_screen.dart';
+import 'license_screen.dart';
 import 'limits_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -150,6 +151,16 @@ class HomeScreen extends StatelessWidget {
                           ),
                           icon: const Icon(Icons.settings_outlined),
                           label: Text(l10n.aiSettings),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const LicenseScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.verified_user_outlined),
+                          label: Text(l10n.subscriptionLicense),
                         ),
                       ],
                     ),

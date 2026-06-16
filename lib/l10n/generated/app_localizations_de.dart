@@ -37,6 +37,111 @@ class AppLocalizationsDe extends AppLocalizations {
   String get aiSettings => 'KI-Einstellungen';
 
   @override
+  String get subscriptionLicense => 'Abonnement / Lizenz';
+
+  @override
+  String get activateLicense => 'Lizenz aktivieren';
+
+  @override
+  String get licenseKey => 'Lizenzschlüssel';
+
+  @override
+  String get activeLicense => 'Aktive Lizenz';
+
+  @override
+  String get expiredLicense => 'Abgelaufene Lizenz';
+
+  @override
+  String get quotaReached => 'Kontingent erreicht';
+
+  @override
+  String get usedDevices => 'Verwendete Geräte';
+
+  @override
+  String get deactivateThisDevice => 'Dieses Gerät deaktivieren';
+
+  @override
+  String get logoutThisDevice => 'Dieses Gerät abmelden';
+
+  @override
+  String get emailAddress => 'E-Mail-Adresse';
+
+  @override
+  String get password => 'Passwort';
+
+  @override
+  String get signIn => 'Anmelden';
+
+  @override
+  String get personalLicense => 'Persönliche Lizenz';
+
+  @override
+  String get personalLicenseInfo =>
+      'Eine PreventIA-Lizenz ist persönlich. Sie ist mit Ihrer E-Mail-Adresse verknüpft und kann auf mehreren autorisierten Geräten verwendet werden.';
+
+  @override
+  String get primaryLicense => 'Hauptlizenz';
+
+  @override
+  String get additionalLicense => 'Zusätzliche Lizenz';
+
+  @override
+  String get licenseType => 'Lizenztyp';
+
+  @override
+  String get price => 'Preis';
+
+  @override
+  String get cycle => 'Zyklus';
+
+  @override
+  String get monthlyCycle => 'Monatlicher Zyklus';
+
+  @override
+  String get annualCycle => 'Jährlicher Zyklus';
+
+  @override
+  String get deviceLimitReached => 'Gerätelimit erreicht';
+
+  @override
+  String get loginRequired => 'Anmeldung erforderlich';
+
+  @override
+  String get loginSuccessful => 'Anmeldung erfolgreich';
+
+  @override
+  String get incorrectPassword => 'Falsches Passwort';
+
+  @override
+  String get simpleDocuments => 'Einfache Dokumente';
+
+  @override
+  String get riskAnalyses => 'Risikoanalysen';
+
+  @override
+  String get subscriptionDoesNotAllowDocument =>
+      'Ihr Abonnement erlaubt dieses Dokument nicht';
+
+  @override
+  String get noSensitiveHardwareIdentifier =>
+      'Die Lizenz ist mit dem Unternehmen und diesem Gerät verknüpft. Es wird keine sensible Hardwarekennung erfasst.';
+
+  @override
+  String get company => 'Unternehmen';
+
+  @override
+  String get plan => 'Plan';
+
+  @override
+  String get expirationDate => 'Ablaufdatum';
+
+  @override
+  String get allowedFeatures => 'Erlaubte Funktionen';
+
+  @override
+  String get refresh => 'Aktualisieren';
+
+  @override
   String get completeFormIntro =>
       'Ergänzen Sie die bekannten Informationen. Leere Felder werden als \"Nicht angegeben / zu prüfen\" gesendet.';
 

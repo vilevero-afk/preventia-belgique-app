@@ -11,6 +11,7 @@ import '../services/ai_document_service.dart';
 import '../services/app_config_service.dart';
 import '../services/document_reference_service.dart';
 import '../services/document_generator.dart';
+import '../services/license_service.dart';
 import '../widgets/adaptive_page.dart';
 import 'result_screen.dart';
 
@@ -104,12 +105,15 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
     try {
       setState(() => _isGeneratingWithAi = true);
-      final result = await AiDocumentService().generateDocument(
-        backendUrl: settings.backendUrl,
-        data: data,
-        languageCode: l10n.localeName,
-        languageLabel: l10n.languageLabel,
-      );
+      final licenseService = LicenseService(backendUrl: settings.backendUrl);
+      await licenseService.validateGeneration(data.documentType);
+      final result = await AiDocumentService(licenseService: licenseService)
+          .generateDocument(
+            backendUrl: settings.backendUrl,
+            data: data,
+            languageCode: l10n.localeName,
+            languageLabel: l10n.languageLabel,
+          );
       if (!mounted) {
         return;
       }
@@ -122,6 +126,17 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         generationSource: result.source,
         linkedDocuments: result.linkedDocuments,
       );
+    } on LicenseException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isGenerating = false;
+        _isGeneratingWithAi = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } on AiDocumentException catch (error) {
       if (!mounted) {
         return;

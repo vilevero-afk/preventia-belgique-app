@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../models/generation_source.dart';
 import '../models/document_form_data.dart';
 import 'app_config_service.dart';
+import 'license_service.dart';
 
 class AiLinkedDocument {
   const AiLinkedDocument({required this.title, required this.content});
@@ -52,11 +53,16 @@ class BackendAvailabilityResult {
 }
 
 class AiDocumentService {
-  AiDocumentService({http.Client? client, Duration? timeout})
-    : _client = client ?? http.Client(),
-      _timeout = timeout ?? const Duration(seconds: 180);
+  AiDocumentService({
+    http.Client? client,
+    Duration? timeout,
+    LicenseService? licenseService,
+  }) : _client = client ?? http.Client(),
+       _licenseService = licenseService,
+       _timeout = timeout ?? const Duration(seconds: 180);
 
   final http.Client _client;
+  final LicenseService? _licenseService;
   final Duration _timeout;
 
   Future<bool> isBackendAvailable({String? backendUrl}) async {
@@ -105,11 +111,15 @@ class AiDocumentService {
     required String languageLabel,
   }) async {
     final uri = _parseBackendUri(backendUrl);
-    final payload = _buildPayload(
+    final licenseService =
+        _licenseService ?? LicenseService(backendUrl: backendUrl);
+    final payload = await _buildPayload(
       data,
       languageCode: languageCode,
       languageLabel: languageLabel,
+      licenseService: licenseService,
     );
+    final authToken = await licenseService.getAuthToken();
     final requestBody = jsonEncode(payload);
 
     try {
@@ -117,9 +127,10 @@ class AiDocumentService {
       final response = await _client
           .post(
             uri,
-            headers: const {
+            headers: {
               'Content-Type': 'application/json; charset=utf-8',
               'Accept': 'application/json',
+              if (authToken != null) 'Authorization': 'Bearer $authToken',
             },
             body: requestBody,
           )
@@ -146,10 +157,13 @@ class AiDocumentService {
       final success = decoded['success'];
       if (success == false) {
         final message = decoded['message'] ?? decoded['error'];
+        final extractedMessage = message is String && message.trim().isNotEmpty
+            ? message.trim()
+            : null;
         throw AiDocumentException(
-          message is String && message.trim().isNotEmpty
-              ? message.trim()
-              : 'Le backend IA a répondu sans succès.',
+          _isLicenseError(decoded, extractedMessage)
+              ? 'Licence requise, expirée ou quota atteint.'
+              : extractedMessage ?? 'Le backend IA a répondu sans succès.',
         );
       }
       if (document is! String || document.trim().isEmpty) {
@@ -284,11 +298,18 @@ class AiDocumentService {
     return isLocalDevelopmentHttpUrl(uri);
   }
 
-  Map<String, dynamic> _buildPayload(
+  Future<Map<String, dynamic>> _buildPayload(
     DocumentFormData data, {
     required String languageCode,
     required String languageLabel,
-  }) {
+    required LicenseService licenseService,
+  }) async {
+    final licenseKey = await licenseService.getLicenseKey();
+    final authToken = await licenseService.getAuthToken();
+    final deviceId = await licenseService.getOrCreateDeviceId();
+    debugPrint(
+      'License attached to generation: ${licenseKey == null && authToken == null ? 'no' : 'yes'}',
+    );
     final formData = data.toJson()
       ..addAll({
         'nomEntreprise': data.companyName,
@@ -333,6 +354,8 @@ class AiDocumentService {
       'documentType': data.documentType,
       'language': languageCode,
       'languageLabel': languageLabel,
+      'licenseKey': licenseKey,
+      'deviceId': deviceId,
       'formData': formData,
     };
   }
@@ -364,6 +387,16 @@ class AiDocumentService {
     }
 
     return null;
+  }
+
+  bool _isLicenseError(Map<String, dynamic> decoded, String? message) {
+    final code = decoded['code'] ?? decoded['errorCode'];
+    final normalized = '${code ?? ''} ${message ?? ''}'.toLowerCase();
+    return normalized.contains('license') ||
+        normalized.contains('licence') ||
+        normalized.contains('quota') ||
+        normalized.contains('expired') ||
+        normalized.contains('expir');
   }
 
   bool _isSuccessfulHealthResponse(http.Response response) {

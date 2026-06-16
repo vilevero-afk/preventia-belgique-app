@@ -36,6 +36,111 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiSettings => 'AI settings';
 
   @override
+  String get subscriptionLicense => 'Subscription / Licence';
+
+  @override
+  String get activateLicense => 'Activate licence';
+
+  @override
+  String get licenseKey => 'Licence key';
+
+  @override
+  String get activeLicense => 'Active licence';
+
+  @override
+  String get expiredLicense => 'Expired licence';
+
+  @override
+  String get quotaReached => 'Quota reached';
+
+  @override
+  String get usedDevices => 'Devices used';
+
+  @override
+  String get deactivateThisDevice => 'Deactivate this device';
+
+  @override
+  String get logoutThisDevice => 'Log out this device';
+
+  @override
+  String get emailAddress => 'Email address';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get signIn => 'Sign in';
+
+  @override
+  String get personalLicense => 'Personal licence';
+
+  @override
+  String get personalLicenseInfo =>
+      'A PreventIA licence is personal. It is linked to your email address and can be used on several authorised devices.';
+
+  @override
+  String get primaryLicense => 'Primary licence';
+
+  @override
+  String get additionalLicense => 'Additional licence';
+
+  @override
+  String get licenseType => 'Licence type';
+
+  @override
+  String get price => 'Price';
+
+  @override
+  String get cycle => 'Cycle';
+
+  @override
+  String get monthlyCycle => 'Monthly cycle';
+
+  @override
+  String get annualCycle => 'Annual cycle';
+
+  @override
+  String get deviceLimitReached => 'Device limit reached';
+
+  @override
+  String get loginRequired => 'Sign-in required';
+
+  @override
+  String get loginSuccessful => 'Signed in successfully';
+
+  @override
+  String get incorrectPassword => 'Incorrect password';
+
+  @override
+  String get simpleDocuments => 'Simple documents';
+
+  @override
+  String get riskAnalyses => 'Risk analyses';
+
+  @override
+  String get subscriptionDoesNotAllowDocument =>
+      'Your subscription does not allow this document';
+
+  @override
+  String get noSensitiveHardwareIdentifier =>
+      'The licence is linked to the company and to this device. No sensitive hardware identifier is collected.';
+
+  @override
+  String get company => 'Company';
+
+  @override
+  String get plan => 'Plan';
+
+  @override
+  String get expirationDate => 'Expiration date';
+
+  @override
+  String get allowedFeatures => 'Allowed features';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
   String get completeFormIntro =>
       'Complete the information you know. Empty fields will be sent as \"Not provided / to be checked\".';
 
