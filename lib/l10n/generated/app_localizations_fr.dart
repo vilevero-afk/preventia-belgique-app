@@ -63,6 +63,23 @@ class AppLocalizationsFr extends AppLocalizations {
   String get logoutThisDevice => 'Déconnecter cet appareil';
 
   @override
+  String get confirmLogoutDeviceMessage =>
+      'Voulez-vous déconnecter cet appareil de votre licence PreventIA ?';
+
+  @override
+  String get logoutBackendFailedMessage =>
+      'La déconnexion auprès du serveur a échoué. Vous pouvez quand même supprimer la session de cet appareil.';
+
+  @override
+  String get logoutLocally => 'Se déconnecter localement';
+
+  @override
+  String get deviceLoggedOut => 'Appareil déconnecté.';
+
+  @override
+  String get continueToApp => 'Continuer vers l’application';
+
+  @override
   String get emailAddress => 'Adresse e-mail';
 
   @override
@@ -70,6 +87,82 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get signIn => 'Se connecter';
+
+  @override
+  String get createLicense => 'Créer une licence';
+
+  @override
+  String get createPreventiaLicenseTitle => 'Créer une licence PreventIA';
+
+  @override
+  String get continueToPayment => 'Continuer vers le paiement';
+
+  @override
+  String get primaryMonthlyLicense => 'Licence principale mensuelle';
+
+  @override
+  String get primaryAnnualLicense => 'Licence principale annuelle';
+
+  @override
+  String get additionalMonthlyLicense => 'Licence supplémentaire mensuelle';
+
+  @override
+  String get additionalAnnualLicense => 'Licence supplémentaire annuelle';
+
+  @override
+  String get manageSubscription => 'Gérer mon abonnement';
+
+  @override
+  String get afterPaymentReturnToApp =>
+      'Après paiement, revenez dans l’application et connectez-vous avec votre e-mail et mot de passe.';
+
+  @override
+  String get passwordConfirmationMismatch =>
+      'Mot de passe et confirmation différents';
+
+  @override
+  String get vatNumber => 'Numéro TVA';
+
+  @override
+  String get companyName => 'Entreprise';
+
+  @override
+  String get firstName => 'Prénom';
+
+  @override
+  String get lastName => 'Nom';
+
+  @override
+  String get addressLine1 => 'Adresse';
+
+  @override
+  String get postalCode => 'Code postal';
+
+  @override
+  String get city => 'Ville';
+
+  @override
+  String get country => 'Pays';
+
+  @override
+  String get repeatPassword => 'Répéter le mot de passe';
+
+  @override
+  String get requiredField => 'Champ obligatoire';
+
+  @override
+  String get invalidEmail => 'Adresse e-mail invalide';
+
+  @override
+  String get passwordMinLength =>
+      'Le mot de passe doit contenir au moins 8 caractères';
+
+  @override
+  String get unableToOpenCheckout => 'Impossible d’ouvrir la page de paiement.';
+
+  @override
+  String get unableToOpenPortal =>
+      'Impossible d’ouvrir la page de gestion d’abonnement.';
 
   @override
   String get personalLicense => 'Licence personnelle';

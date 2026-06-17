@@ -62,7 +62,8 @@ class LicenseStatus {
   }
 
   factory LicenseStatus.fromJson(Map<String, dynamic> json) {
-    final rawStatus = json['license'] ?? json['status'] ?? json;
+    final rawStatus =
+        json['licenseStatus'] ?? json['license'] ?? json['status'] ?? json;
     final source = rawStatus is Map<String, dynamic> ? rawStatus : json;
     return LicenseStatus(
       plan: _stringValue(source['plan']),

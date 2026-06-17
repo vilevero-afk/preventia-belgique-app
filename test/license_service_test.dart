@@ -273,6 +273,70 @@ void main() {
       expect(await storage.read(key: 'cachedLicenseStatus'), isNotNull);
     });
 
+    test('login parses token and licenseStatus response shape', () async {
+      final storage = _MemoryLicenseStorage();
+      await storage.write(key: 'deviceId', value: 'device-test');
+      final service = LicenseService(
+        storage: storage,
+        client: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'token': 'token-test',
+              'licenseStatus': {
+                'email': 'user@example.com',
+                'licenseType': 'additional',
+                'billingCycle': 'annual',
+                'price': 390,
+                'maxDevices': 3,
+                'activatedDevices': 1,
+                'monthlySimpleDocumentsLimit': 50,
+                'monthlyRiskAnalysisLimit': 10,
+                'usedSimpleDocumentsThisMonth': 4,
+                'usedRiskAnalysisThisMonth': 2,
+                'isActive': true,
+              },
+            }),
+            200,
+          );
+        }),
+      );
+
+      final status = await service.login('user@example.com', 'secret');
+
+      expect(status.isActive, isTrue);
+      expect(status.email, 'user@example.com');
+      expect(status.licenseType, 'additional');
+      expect(status.billingCycle, 'annual');
+      expect(status.price, 390);
+      expect(await storage.read(key: 'authToken'), 'token-test');
+      expect(await storage.read(key: 'email'), 'user@example.com');
+      expect(await storage.read(key: 'cachedLicenseStatus'), isNotNull);
+    });
+
+    test('login throws backend message when success is false', () async {
+      final service = LicenseService(
+        storage: _MemoryLicenseStorage(),
+        client: MockClient((request) async {
+          return http.Response(
+            jsonEncode({'success': false, 'message': 'Identifiants invalides'}),
+            200,
+          );
+        }),
+      );
+
+      expect(
+        () => service.login('user@example.com', 'secret'),
+        throwsA(
+          isA<LicenseException>().having(
+            (error) => error.message,
+            'message',
+            'Identifiants invalides',
+          ),
+        ),
+      );
+    });
+
     test('validate-generation uses auth endpoint and bearer token', () async {
       Uri? requestedUri;
       Map<String, dynamic>? payload;
@@ -305,6 +369,144 @@ void main() {
       expect(payload?['deviceId'], 'device-test');
       expect(payload?['documentType'], 'Analyse de risques générale');
     });
+
+    test('hasActiveSession returns false without auth token', () async {
+      final service = LicenseService(storage: _MemoryLicenseStorage());
+
+      expect(await service.hasActiveSession(), isFalse);
+    });
+
+    test('hasActiveSession validates token with auth me endpoint', () async {
+      Uri? requestedUri;
+      String? authorization;
+      final storage = _MemoryLicenseStorage();
+      await storage.write(key: 'authToken', value: 'token-test');
+      final service = LicenseService(
+        storage: storage,
+        client: MockClient((request) async {
+          requestedUri = request.url;
+          authorization = request.headers['Authorization'];
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'email': 'user@example.com',
+              'license': {'isActive': true},
+            }),
+            200,
+          );
+        }),
+      );
+
+      expect(await service.hasActiveSession(), isTrue);
+      expect(
+        requestedUri,
+        Uri.parse('https://preventia-backend-gjhg.onrender.com/api/auth/me'),
+      );
+      expect(authorization, 'Bearer token-test');
+      expect(await storage.read(key: 'cachedLicenseStatus'), isNotNull);
+    });
+
+    test('hasActiveSession clears expired token', () async {
+      final storage = _MemoryLicenseStorage();
+      await storage.write(key: 'authToken', value: 'token-test');
+      await storage.write(key: 'email', value: 'user@example.com');
+      await storage.write(key: 'cachedLicenseStatus', value: '{}');
+      await storage.write(key: 'deviceId', value: 'device-test');
+      final service = LicenseService(
+        storage: storage,
+        client: MockClient((request) async {
+          return http.Response(jsonEncode({'error': 'Token expiré'}), 401);
+        }),
+      );
+
+      expect(await service.hasActiveSession(), isFalse);
+      expect(await storage.read(key: 'authToken'), isNull);
+      expect(await storage.read(key: 'email'), isNull);
+      expect(await storage.read(key: 'cachedLicenseStatus'), isNull);
+      expect(await storage.read(key: 'deviceId'), 'device-test');
+    });
+
+    test('hasActiveSession keeps token on network failure', () async {
+      final storage = _MemoryLicenseStorage();
+      await storage.write(key: 'authToken', value: 'token-test');
+      final service = LicenseService(
+        storage: storage,
+        client: MockClient((request) async {
+          throw http.ClientException('Network unavailable');
+        }),
+      );
+
+      expect(await service.hasActiveSession(), isFalse);
+      expect(await storage.read(key: 'authToken'), 'token-test');
+    });
+
+    test(
+      'logoutThisDevice calls auth endpoint and clears local session',
+      () async {
+        Uri? requestedUri;
+        Map<String, dynamic>? payload;
+        String? authorization;
+        final storage = _MemoryLicenseStorage();
+        await storage.write(key: 'authToken', value: 'token-test');
+        await storage.write(key: 'email', value: 'user@example.com');
+        await storage.write(key: 'cachedLicenseStatus', value: '{}');
+        await storage.write(key: 'deviceId', value: 'device-test');
+        final service = LicenseService(
+          storage: storage,
+          client: MockClient((request) async {
+            requestedUri = request.url;
+            authorization = request.headers['Authorization'];
+            payload = jsonDecode(request.body) as Map<String, dynamic>;
+            return http.Response(jsonEncode({'success': true}), 200);
+          }),
+        );
+
+        await service.logoutThisDevice();
+
+        expect(
+          requestedUri,
+          Uri.parse(
+            'https://preventia-backend-gjhg.onrender.com/api/auth/logout-device',
+          ),
+        );
+        expect(authorization, 'Bearer token-test');
+        expect(payload, {'deviceId': 'device-test'});
+        expect(await storage.read(key: 'authToken'), isNull);
+        expect(await storage.read(key: 'email'), isNull);
+        expect(await storage.read(key: 'cachedLicenseStatus'), isNull);
+        expect(await storage.read(key: 'deviceId'), 'device-test');
+      },
+    );
+
+    test(
+      'logoutThisDevice clears local session after backend failure',
+      () async {
+        var calls = 0;
+        final storage = _MemoryLicenseStorage();
+        await storage.write(key: 'authToken', value: 'token-test');
+        await storage.write(key: 'email', value: 'user@example.com');
+        await storage.write(key: 'cachedLicenseStatus', value: '{}');
+        await storage.write(key: 'deviceId', value: 'device-test');
+        final service = LicenseService(
+          storage: storage,
+          client: MockClient((request) async {
+            calls += 1;
+            return http.Response(
+              jsonEncode({'error': 'Service indisponible'}),
+              503,
+            );
+          }),
+        );
+
+        await service.logoutThisDevice();
+
+        expect(calls, 1);
+        expect(await storage.read(key: 'authToken'), isNull);
+        expect(await storage.read(key: 'email'), isNull);
+        expect(await storage.read(key: 'cachedLicenseStatus'), isNull);
+        expect(await storage.read(key: 'deviceId'), 'device-test');
+      },
+    );
   });
 }
 

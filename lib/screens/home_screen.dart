@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../models/document_type.dart';
 import '../models/prevention_document_config.dart';
+import '../services/license_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/language_selector.dart';
 import 'ai_settings_screen.dart';
@@ -156,11 +157,19 @@ class HomeScreen extends StatelessWidget {
                         TextButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const LicenseScreen(),
+                              builder: (_) => LicenseScreen(
+                                onContinue: () => Navigator.of(context).pop(),
+                              ),
                             ),
                           ),
                           icon: const Icon(Icons.verified_user_outlined),
                           label: Text(l10n.subscriptionLicense),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: () => _confirmLogout(context),
+                          icon: const Icon(Icons.logout_outlined),
+                          label: const Text('Déconnexion'),
                         ),
                       ],
                     ),
@@ -184,5 +193,45 @@ class HomeScreen extends StatelessWidget {
       'incident' => Icons.report_problem_outlined,
       _ => Icons.description_outlined,
     };
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          title: const Text('Déconnexion'),
+          content: Text(l10n.confirmLogoutDeviceMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Déconnexion'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    final service = LicenseService();
+    try {
+      await service.logoutThisDevice();
+    } on Object catch (error) {
+      debugPrint('Home logout unavailable: $error');
+      await service.clearSession();
+    }
+    if (!context.mounted) {
+      return;
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const LicenseScreen()),
+      (route) => false,
+    );
   }
 }

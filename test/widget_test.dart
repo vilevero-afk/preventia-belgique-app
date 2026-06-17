@@ -4,6 +4,7 @@ import 'package:preventia_belgique_app/main.dart';
 import 'package:preventia_belgique_app/screens/document_form_screen.dart';
 import 'package:preventia_belgique_app/services/app_config_service.dart';
 import 'package:preventia_belgique_app/services/app_locale_controller.dart';
+import 'package:preventia_belgique_app/services/license_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -15,8 +16,12 @@ void main() {
     await localeController.load();
 
     await tester.pumpWidget(
-      PreventiaBelgiqueApp(localeController: localeController),
+      PreventiaBelgiqueApp(
+        localeController: localeController,
+        licenseService: _ActiveSessionLicenseService(),
+      ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('PreventIA Belgique'), findsOneWidget);
     expect(
@@ -46,8 +51,12 @@ void main() {
     await localeController.load();
 
     await tester.pumpWidget(
-      PreventiaBelgiqueApp(localeController: localeController),
+      PreventiaBelgiqueApp(
+        localeController: localeController,
+        licenseService: _ActiveSessionLicenseService(),
+      ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Risicoanalyse'));
     await tester.pumpAndSettle();
@@ -87,8 +96,12 @@ void main() {
     await localeController.load();
 
     await tester.pumpWidget(
-      PreventiaBelgiqueApp(localeController: localeController),
+      PreventiaBelgiqueApp(
+        localeController: localeController,
+        licenseService: _ActiveSessionLicenseService(),
+      ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Risk assessment'));
     await tester.pumpAndSettle();
@@ -115,8 +128,12 @@ void main() {
     await localeController.load();
 
     await tester.pumpWidget(
-      PreventiaBelgiqueApp(localeController: localeController),
+      PreventiaBelgiqueApp(
+        localeController: localeController,
+        licenseService: _ActiveSessionLicenseService(),
+      ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Gefährdungsbeurteilung'));
     await tester.pumpAndSettle();
@@ -147,8 +164,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      PreventiaBelgiqueApp(localeController: localeController),
+      PreventiaBelgiqueApp(
+        localeController: localeController,
+        licenseService: _ActiveSessionLicenseService(),
+      ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Gefährdungsbeurteilung'));
     await tester.pumpAndSettle();
@@ -177,4 +198,9 @@ void main() {
 
     expect(sectionCard().color, Colors.white);
   });
+}
+
+class _ActiveSessionLicenseService extends LicenseService {
+  @override
+  Future<bool> hasActiveSession() async => true;
 }

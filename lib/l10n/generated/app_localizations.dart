@@ -210,6 +210,36 @@ abstract class AppLocalizations {
   /// **'Déconnecter cet appareil'**
   String get logoutThisDevice;
 
+  /// No description provided for @confirmLogoutDeviceMessage.
+  ///
+  /// In fr, this message translates to:
+  /// **'Voulez-vous déconnecter cet appareil de votre licence PreventIA ?'**
+  String get confirmLogoutDeviceMessage;
+
+  /// No description provided for @logoutBackendFailedMessage.
+  ///
+  /// In fr, this message translates to:
+  /// **'La déconnexion auprès du serveur a échoué. Vous pouvez quand même supprimer la session de cet appareil.'**
+  String get logoutBackendFailedMessage;
+
+  /// No description provided for @logoutLocally.
+  ///
+  /// In fr, this message translates to:
+  /// **'Se déconnecter localement'**
+  String get logoutLocally;
+
+  /// No description provided for @deviceLoggedOut.
+  ///
+  /// In fr, this message translates to:
+  /// **'Appareil déconnecté.'**
+  String get deviceLoggedOut;
+
+  /// No description provided for @continueToApp.
+  ///
+  /// In fr, this message translates to:
+  /// **'Continuer vers l’application'**
+  String get continueToApp;
+
   /// No description provided for @emailAddress.
   ///
   /// In fr, this message translates to:
@@ -227,6 +257,150 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Se connecter'**
   String get signIn;
+
+  /// No description provided for @createLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Créer une licence'**
+  String get createLicense;
+
+  /// No description provided for @createPreventiaLicenseTitle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Créer une licence PreventIA'**
+  String get createPreventiaLicenseTitle;
+
+  /// No description provided for @continueToPayment.
+  ///
+  /// In fr, this message translates to:
+  /// **'Continuer vers le paiement'**
+  String get continueToPayment;
+
+  /// No description provided for @primaryMonthlyLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence principale mensuelle'**
+  String get primaryMonthlyLicense;
+
+  /// No description provided for @primaryAnnualLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence principale annuelle'**
+  String get primaryAnnualLicense;
+
+  /// No description provided for @additionalMonthlyLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence supplémentaire mensuelle'**
+  String get additionalMonthlyLicense;
+
+  /// No description provided for @additionalAnnualLicense.
+  ///
+  /// In fr, this message translates to:
+  /// **'Licence supplémentaire annuelle'**
+  String get additionalAnnualLicense;
+
+  /// No description provided for @manageSubscription.
+  ///
+  /// In fr, this message translates to:
+  /// **'Gérer mon abonnement'**
+  String get manageSubscription;
+
+  /// No description provided for @afterPaymentReturnToApp.
+  ///
+  /// In fr, this message translates to:
+  /// **'Après paiement, revenez dans l’application et connectez-vous avec votre e-mail et mot de passe.'**
+  String get afterPaymentReturnToApp;
+
+  /// No description provided for @passwordConfirmationMismatch.
+  ///
+  /// In fr, this message translates to:
+  /// **'Mot de passe et confirmation différents'**
+  String get passwordConfirmationMismatch;
+
+  /// No description provided for @vatNumber.
+  ///
+  /// In fr, this message translates to:
+  /// **'Numéro TVA'**
+  String get vatNumber;
+
+  /// No description provided for @companyName.
+  ///
+  /// In fr, this message translates to:
+  /// **'Entreprise'**
+  String get companyName;
+
+  /// No description provided for @firstName.
+  ///
+  /// In fr, this message translates to:
+  /// **'Prénom'**
+  String get firstName;
+
+  /// No description provided for @lastName.
+  ///
+  /// In fr, this message translates to:
+  /// **'Nom'**
+  String get lastName;
+
+  /// No description provided for @addressLine1.
+  ///
+  /// In fr, this message translates to:
+  /// **'Adresse'**
+  String get addressLine1;
+
+  /// No description provided for @postalCode.
+  ///
+  /// In fr, this message translates to:
+  /// **'Code postal'**
+  String get postalCode;
+
+  /// No description provided for @city.
+  ///
+  /// In fr, this message translates to:
+  /// **'Ville'**
+  String get city;
+
+  /// No description provided for @country.
+  ///
+  /// In fr, this message translates to:
+  /// **'Pays'**
+  String get country;
+
+  /// No description provided for @repeatPassword.
+  ///
+  /// In fr, this message translates to:
+  /// **'Répéter le mot de passe'**
+  String get repeatPassword;
+
+  /// No description provided for @requiredField.
+  ///
+  /// In fr, this message translates to:
+  /// **'Champ obligatoire'**
+  String get requiredField;
+
+  /// No description provided for @invalidEmail.
+  ///
+  /// In fr, this message translates to:
+  /// **'Adresse e-mail invalide'**
+  String get invalidEmail;
+
+  /// No description provided for @passwordMinLength.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le mot de passe doit contenir au moins 8 caractères'**
+  String get passwordMinLength;
+
+  /// No description provided for @unableToOpenCheckout.
+  ///
+  /// In fr, this message translates to:
+  /// **'Impossible d’ouvrir la page de paiement.'**
+  String get unableToOpenCheckout;
+
+  /// No description provided for @unableToOpenPortal.
+  ///
+  /// In fr, this message translates to:
+  /// **'Impossible d’ouvrir la page de gestion d’abonnement.'**
+  String get unableToOpenPortal;
 
   /// No description provided for @personalLicense.
   ///

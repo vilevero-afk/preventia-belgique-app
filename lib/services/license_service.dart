@@ -163,6 +163,37 @@ class LicenseService {
     await _deleteStorage(_authTokenStorageKey);
     await _deleteStorage(_emailStorageKey);
     await _deleteStorage(_authCachedStatusStorageKey);
+    debugPrint('logout local session cleared');
+  }
+
+  Future<LicenseStatus?> getCachedLicenseStatus() {
+    return _readCachedStatus();
+  }
+
+  Future<bool> hasActiveSession() async {
+    final token = await getAuthToken();
+    debugPrint('auth token exists ${token == null ? 'no' : 'yes'}');
+    if (token == null) {
+      return false;
+    }
+    try {
+      final status = await _fetchAuthMeStatus(token);
+      if (status == null) {
+        return false;
+      }
+      await _cacheStatus(status);
+      return status.isActive;
+    } on FormatException catch (error) {
+      debugPrint('License session check invalid response: $error');
+      return false;
+    } on LicenseException catch (error) {
+      debugPrint('License session check rejected: ${error.message}');
+      await clearSession();
+      return false;
+    } on Object catch (error) {
+      debugPrint('License session check unavailable: $error');
+      return false;
+    }
   }
 
   Future<LicenseStatus> login(String email, String password) async {
@@ -179,7 +210,11 @@ class LicenseService {
       'platform': _platformName(),
       'appVersion': _appVersion(),
     });
+    if (decoded['success'] == false) {
+      throw LicenseException(_messageFrom(decoded) ?? 'Connexion refusée.');
+    }
     final token = _tokenFrom(decoded);
+    debugPrint('login success token received ${token == null ? 'no' : 'yes'}');
     if (token == null) {
       throw const LicenseException('Réponse de connexion invalide.');
     }
@@ -189,6 +224,11 @@ class LicenseService {
       ...decoded,
       'email': decoded['email'] ?? normalizedEmail,
     });
+    final hasStatusPayload =
+        decoded['licenseStatus'] is Map<String, dynamic> ||
+        decoded['license'] is Map<String, dynamic> ||
+        decoded['status'] is Map<String, dynamic>;
+    debugPrint('licenseStatus parsed ${hasStatusPayload ? 'yes' : 'no'}');
     await _cacheStatus(status);
     return status;
   }
@@ -214,7 +254,7 @@ class LicenseService {
   Future<LicenseStatus> getLicenseStatus() async {
     final token = await getAuthToken();
     if (token != null) {
-      return getCurrentLicenseStatus();
+      return await getCurrentLicenseStatus() ?? LicenseStatus.inactive();
     }
     final licenseKey = await getLicenseKey();
     if (licenseKey == null) {
@@ -236,7 +276,8 @@ class LicenseService {
   Future<LicenseStatus> refreshLicenseStatus() async {
     final token = await getAuthToken();
     if (token != null) {
-      return getCurrentLicenseStatus(forceRefresh: true);
+      return await getCurrentLicenseStatus(forceRefresh: true) ??
+          LicenseStatus.inactive();
     }
     final licenseKey = await getLicenseKey();
     if (licenseKey == null) {
@@ -254,12 +295,19 @@ class LicenseService {
     await logoutThisDevice();
   }
 
-  Future<void> logoutThisDevice() async {
+  Future<void> logoutThisDevice({bool localOnly = false}) async {
     final token = await getAuthToken();
     if (token != null) {
-      await _postJson('/api/auth/logout-device', {
-        'deviceId': await getOrCreateDeviceId(),
-      }, authToken: token);
+      if (!localOnly) {
+        final deviceId = await getOrCreateDeviceId();
+        try {
+          await _postJson('/api/auth/logout-device', {
+            'deviceId': deviceId,
+          }, authToken: token);
+        } on Object catch (error) {
+          debugPrint('License logout unavailable: $error');
+        }
+      }
       await clearSession();
       return;
     }
@@ -273,15 +321,13 @@ class LicenseService {
     await clearLicense();
   }
 
-  Future<LicenseStatus> getCurrentLicenseStatus({
+  Future<LicenseStatus?> getCurrentLicenseStatus({
     bool forceRefresh = false,
   }) async {
     final token = await getAuthToken();
+    debugPrint('auth token exists ${token == null ? 'no' : 'yes'}');
     if (token == null) {
-      if (forceRefresh) {
-        return refreshLicenseStatus();
-      }
-      return getLicenseStatus();
+      return null;
     }
     if (!forceRefresh) {
       final cached = await _readCachedStatus();
@@ -290,17 +336,17 @@ class LicenseService {
       }
     }
     try {
-      final decoded = await _getJson('/api/auth/me', authToken: token);
-      final email = await getEmail();
-      final status = LicenseStatus.fromJson({
-        ...decoded,
-        if (email != null) 'email': decoded['email'] ?? email,
-      });
-      await _cacheStatus(status);
-      return status;
+      return await _fetchAuthMeStatus(token);
+    } on FormatException catch (error) {
+      debugPrint('License status invalid response: $error');
+      return await _readCachedStatus();
+    } on LicenseException catch (error) {
+      debugPrint('License status rejected: ${error.message}');
+      await clearSession();
+      return null;
     } on Object catch (error) {
       debugPrint('License status unavailable: $error');
-      return await _readCachedStatus() ?? LicenseStatus.inactive();
+      return await _readCachedStatus();
     }
   }
 
@@ -387,7 +433,7 @@ class LicenseService {
       body: jsonEncode(payload),
     );
     debugPrint('License HTTP status code: ${response.statusCode}');
-    debugPrint('License backend response body: ${response.body}');
+    _debugResponseBody(response.body);
     final decoded = response.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(utf8.decode(response.bodyBytes));
@@ -402,21 +448,19 @@ class LicenseService {
     return decoded;
   }
 
-  Future<Map<String, dynamic>> _getJson(
-    String path, {
-    required String authToken,
-  }) async {
-    final uri = _licenseUri(path);
+  Future<LicenseStatus?> _fetchAuthMeStatus(String token) async {
+    final uri = _licenseUri('/api/auth/me');
     debugPrint('License endpoint called: $uri');
     final response = await _client.get(
       uri,
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $authToken',
-      },
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
-    debugPrint('License HTTP status code: ${response.statusCode}');
-    debugPrint('License backend response body: ${response.body}');
+    debugPrint('/api/auth/me status code: ${response.statusCode}');
+    debugPrint('/api/auth/me body: ${_redactedBody(response.body)}');
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      await clearSession();
+      return null;
+    }
     final decoded = response.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(utf8.decode(response.bodyBytes));
@@ -424,11 +468,19 @@ class LicenseService {
       throw const LicenseException('Réponse licence invalide.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw LicenseException(
-        _messageFrom(decoded) ?? 'Service de licence indisponible.',
-      );
+      return null;
     }
-    return decoded;
+    if (decoded['success'] != true) {
+      await clearSession();
+      return null;
+    }
+    final email = await getEmail();
+    final status = LicenseStatus.fromJson({
+      ...decoded,
+      if (email != null) 'email': decoded['email'] ?? email,
+    });
+    await _cacheStatus(status);
+    return status;
   }
 
   Uri _licenseUri(String path) {
@@ -550,6 +602,38 @@ class LicenseService {
       return value.trim();
     }
     return null;
+  }
+
+  static void _debugResponseBody(String body) {
+    debugPrint('License backend response body: ${_redactedBody(body)}');
+  }
+
+  static String _redactedBody(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      return jsonEncode(_redactSecrets(decoded));
+    } on Object {
+      return body;
+    }
+  }
+
+  static Object? _redactSecrets(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value.map((key, item) {
+        final normalizedKey = key.toLowerCase();
+        final isSecret =
+            normalizedKey == 'authtoken' ||
+            normalizedKey == 'token' ||
+            normalizedKey == 'accesstoken' ||
+            normalizedKey == 'jwt' ||
+            normalizedKey == 'password';
+        return MapEntry(key, isSecret ? '[redacted]' : _redactSecrets(item));
+      });
+    }
+    if (value is List) {
+      return value.map(_redactSecrets).toList(growable: false);
+    }
+    return value;
   }
 }
 

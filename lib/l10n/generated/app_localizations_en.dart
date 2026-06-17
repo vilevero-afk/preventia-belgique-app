@@ -63,6 +63,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logoutThisDevice => 'Log out this device';
 
   @override
+  String get confirmLogoutDeviceMessage =>
+      'Do you want to disconnect this device from your PreventIA licence?';
+
+  @override
+  String get logoutBackendFailedMessage =>
+      'The server logout failed. You can still remove the session from this device.';
+
+  @override
+  String get logoutLocally => 'Log out locally';
+
+  @override
+  String get deviceLoggedOut => 'Device disconnected.';
+
+  @override
+  String get continueToApp => 'Continue to the application';
+
+  @override
   String get emailAddress => 'Email address';
 
   @override
@@ -70,6 +87,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signIn => 'Sign in';
+
+  @override
+  String get createLicense => 'Create a licence';
+
+  @override
+  String get createPreventiaLicenseTitle => 'Create a PreventIA licence';
+
+  @override
+  String get continueToPayment => 'Continue to payment';
+
+  @override
+  String get primaryMonthlyLicense => 'Primary monthly licence';
+
+  @override
+  String get primaryAnnualLicense => 'Primary annual licence';
+
+  @override
+  String get additionalMonthlyLicense => 'Additional monthly licence';
+
+  @override
+  String get additionalAnnualLicense => 'Additional annual licence';
+
+  @override
+  String get manageSubscription => 'Manage my subscription';
+
+  @override
+  String get afterPaymentReturnToApp =>
+      'After payment, return to the application and sign in with your email and password.';
+
+  @override
+  String get passwordConfirmationMismatch =>
+      'Password and confirmation do not match';
+
+  @override
+  String get vatNumber => 'VAT number';
+
+  @override
+  String get companyName => 'Company';
+
+  @override
+  String get firstName => 'First name';
+
+  @override
+  String get lastName => 'Last name';
+
+  @override
+  String get addressLine1 => 'Address';
+
+  @override
+  String get postalCode => 'Postal code';
+
+  @override
+  String get city => 'City';
+
+  @override
+  String get country => 'Country';
+
+  @override
+  String get repeatPassword => 'Repeat password';
+
+  @override
+  String get requiredField => 'Required field';
+
+  @override
+  String get invalidEmail => 'Invalid email address';
+
+  @override
+  String get passwordMinLength =>
+      'The password must contain at least 8 characters';
+
+  @override
+  String get unableToOpenCheckout => 'Unable to open the payment page.';
+
+  @override
+  String get unableToOpenPortal =>
+      'Unable to open the subscription management page.';
 
   @override
   String get personalLicense => 'Personal licence';

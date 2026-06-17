@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../models/license_status.dart';
+import '../services/billing_service.dart';
 import '../services/license_service.dart';
 import '../widgets/adaptive_page.dart';
+import 'home_screen.dart';
+import 'register_license_screen.dart';
 
 class LicenseScreen extends StatefulWidget {
-  const LicenseScreen({super.key});
+  const LicenseScreen({this.onContinue, super.key});
+
+  final VoidCallback? onContinue;
 
   @override
   State<LicenseScreen> createState() => _LicenseScreenState();
@@ -17,8 +23,10 @@ class _LicenseScreenState extends State<LicenseScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _service = LicenseService();
+  late final _billingService = BillingService(licenseService: _service);
 
-  LicenseStatus? _status;
+  bool _isLoggedIn = false;
+  LicenseStatus? _licenseStatus;
   bool _isLoading = true;
   bool _isSubmitting = false;
 
@@ -37,14 +45,18 @@ class _LicenseScreenState extends State<LicenseScreen> {
 
   Future<void> _load() async {
     try {
-      final email = await _service.getEmail();
       final status = await _service.getCurrentLicenseStatus();
+      final email = await _service.getEmail();
       if (!mounted) {
         return;
       }
+      debugPrint(
+        'LicenseScreen loaded active session ${status == null ? 'no' : 'yes'}',
+      );
       setState(() {
-        _emailController.text = email ?? status.email;
-        _status = status;
+        _emailController.text = email ?? status?.email ?? '';
+        _isLoggedIn = status != null;
+        _licenseStatus = status;
         _isLoading = false;
       });
     } on LicenseException catch (error) {
@@ -52,7 +64,8 @@ class _LicenseScreenState extends State<LicenseScreen> {
         return;
       }
       setState(() {
-        _status = LicenseStatus.inactive();
+        _isLoggedIn = false;
+        _licenseStatus = null;
         _isLoading = false;
       });
       _showSnackBar(error.message, isError: true);
@@ -61,7 +74,8 @@ class _LicenseScreenState extends State<LicenseScreen> {
         return;
       }
       setState(() {
-        _status = LicenseStatus.inactive();
+        _isLoggedIn = false;
+        _licenseStatus = null;
         _isLoading = false;
       });
       _showSnackBar(error.toString(), isError: true);
@@ -78,8 +92,12 @@ class _LicenseScreenState extends State<LicenseScreen> {
       if (!mounted) {
         return;
       }
+      debugPrint('switching UI to logged in');
       setState(() {
-        _status = status;
+        _isLoggedIn = true;
+        _licenseStatus = status;
+        _isLoading = false;
+        _isSubmitting = false;
         _emailController.text = status.email.isEmpty
             ? _emailController.text.trim()
             : status.email;
@@ -110,7 +128,10 @@ class _LicenseScreenState extends State<LicenseScreen> {
       if (!mounted) {
         return;
       }
-      setState(() => _status = status);
+      setState(() {
+        _isLoggedIn = status != null;
+        _licenseStatus = status;
+      });
     } on LicenseException catch (error) {
       if (!mounted) {
         return;
@@ -128,18 +149,21 @@ class _LicenseScreenState extends State<LicenseScreen> {
     }
   }
 
-  Future<void> _logoutThisDevice() async {
+  Future<void> _manageSubscription() async {
     setState(() => _isSubmitting = true);
     try {
-      await _service.logoutThisDevice();
+      final portalUrl = await _billingService.createPortalSession();
+      final opened = await launchUrl(
+        Uri.parse(portalUrl),
+        mode: LaunchMode.externalApplication,
+      );
       if (!mounted) {
         return;
       }
-      setState(() {
-        _status = LicenseStatus.inactive();
-        _passwordController.clear();
-      });
-    } on LicenseException catch (error) {
+      if (!opened) {
+        _showSnackBar(l10n(context).unableToOpenPortal, isError: true);
+      }
+    } on BillingException catch (error) {
       if (!mounted) {
         return;
       }
@@ -148,6 +172,100 @@ class _LicenseScreenState extends State<LicenseScreen> {
       if (!mounted) {
         return;
       }
+      _showSnackBar(error.toString(), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _logoutThisDevice() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final l10n = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l10n.logoutThisDevice),
+          content: Text(l10n.confirmLogoutDeviceMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.logoutThisDevice),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    await _performLogout(localOnly: false);
+  }
+
+  void _continueToApp() {
+    final onContinue = widget.onContinue;
+    if (onContinue != null) {
+      onContinue();
+      return;
+    }
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+    );
+  }
+
+  Future<void> _performLogout({required bool localOnly}) async {
+    setState(() => _isSubmitting = true);
+    try {
+      await _service.logoutThisDevice(localOnly: localOnly);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoggedIn = false;
+        _licenseStatus = null;
+        _emailController.clear();
+        _passwordController.clear();
+      });
+      _showSnackBar(l10n(context).deviceLoggedOut, isError: false);
+    } on LicenseException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await _service.clearSession();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoggedIn = false;
+        _licenseStatus = null;
+        _emailController.clear();
+        _passwordController.clear();
+      });
+      _showSnackBar(error.message, isError: true);
+    } on Object catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await _service.clearSession();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoggedIn = false;
+        _licenseStatus = null;
+        _emailController.clear();
+        _passwordController.clear();
+      });
       _showSnackBar(error.toString(), isError: true);
     } finally {
       if (mounted) {
@@ -168,7 +286,7 @@ class _LicenseScreenState extends State<LicenseScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final status = _status;
+    final status = _licenseStatus;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.subscriptionLicense)),
       body: _isLoading
@@ -177,19 +295,28 @@ class _LicenseScreenState extends State<LicenseScreen> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  if (status == null || !status.isActive)
+                  if (!_isLoggedIn || status == null)
                     _LoginPanel(
                       emailController: _emailController,
                       passwordController: _passwordController,
                       isSubmitting: _isSubmitting,
                       onLogin: _login,
+                      onCreateLicense: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const RegisterLicenseScreen(),
+                          ),
+                        );
+                      },
                     )
                   else
                     _StatusPanel(
                       status: status,
                       isSubmitting: _isSubmitting,
                       onRefresh: _refresh,
+                      onManageSubscription: _manageSubscription,
                       onLogout: _logoutThisDevice,
+                      onContinue: _continueToApp,
                     ),
                 ],
               ),
@@ -206,12 +333,14 @@ class _LoginPanel extends StatelessWidget {
     required this.passwordController,
     required this.isSubmitting,
     required this.onLogin,
+    required this.onCreateLicense,
   });
 
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final bool isSubmitting;
   final VoidCallback onLogin;
+  final VoidCallback onCreateLicense;
 
   @override
   Widget build(BuildContext context) {
@@ -257,6 +386,12 @@ class _LoginPanel extends StatelessWidget {
               : const Icon(Icons.login_outlined),
           label: Text(l10n.signIn),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: isSubmitting ? null : onCreateLicense,
+          icon: const Icon(Icons.add_card_outlined),
+          label: Text(l10n.createLicense),
+        ),
       ],
     );
   }
@@ -267,13 +402,17 @@ class _StatusPanel extends StatelessWidget {
     required this.status,
     required this.isSubmitting,
     required this.onRefresh,
+    required this.onManageSubscription,
     required this.onLogout,
+    required this.onContinue,
   });
 
   final LicenseStatus status;
   final bool isSubmitting;
   final VoidCallback onRefresh;
+  final VoidCallback onManageSubscription;
   final VoidCallback onLogout;
+  final VoidCallback? onContinue;
 
   @override
   Widget build(BuildContext context) {
@@ -330,12 +469,25 @@ class _StatusPanel extends StatelessWidget {
               label: Text(l10n.refresh),
             ),
             OutlinedButton.icon(
+              onPressed: isSubmitting ? null : onManageSubscription,
+              icon: const Icon(Icons.manage_accounts_outlined),
+              label: Text(l10n.manageSubscription),
+            ),
+            OutlinedButton.icon(
               onPressed: isSubmitting ? null : onLogout,
               icon: const Icon(Icons.logout_outlined),
               label: Text(l10n.logoutThisDevice),
             ),
           ],
         ),
+        if (onContinue != null) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: isSubmitting ? null : onContinue,
+            icon: const Icon(Icons.arrow_forward_outlined),
+            label: Text(l10n.continueToApp),
+          ),
+        ],
       ],
     );
   }

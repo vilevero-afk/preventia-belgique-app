@@ -64,6 +64,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get logoutThisDevice => 'Dieses Gerät abmelden';
 
   @override
+  String get confirmLogoutDeviceMessage =>
+      'Möchten Sie dieses Gerät von Ihrer PreventIA-Lizenz trennen?';
+
+  @override
+  String get logoutBackendFailedMessage =>
+      'Die Abmeldung beim Server ist fehlgeschlagen. Sie können die Sitzung trotzdem von diesem Gerät entfernen.';
+
+  @override
+  String get logoutLocally => 'Lokal abmelden';
+
+  @override
+  String get deviceLoggedOut => 'Gerät abgemeldet.';
+
+  @override
+  String get continueToApp => 'Zur Anwendung weitergehen';
+
+  @override
   String get emailAddress => 'E-Mail-Adresse';
 
   @override
@@ -71,6 +88,83 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get signIn => 'Anmelden';
+
+  @override
+  String get createLicense => 'Lizenz erstellen';
+
+  @override
+  String get createPreventiaLicenseTitle => 'PreventIA-Lizenz erstellen';
+
+  @override
+  String get continueToPayment => 'Weiter zur Zahlung';
+
+  @override
+  String get primaryMonthlyLicense => 'Monatliche Hauptlizenz';
+
+  @override
+  String get primaryAnnualLicense => 'Jährliche Hauptlizenz';
+
+  @override
+  String get additionalMonthlyLicense => 'Monatliche Zusatzlizenz';
+
+  @override
+  String get additionalAnnualLicense => 'Jährliche Zusatzlizenz';
+
+  @override
+  String get manageSubscription => 'Mein Abonnement verwalten';
+
+  @override
+  String get afterPaymentReturnToApp =>
+      'Kehren Sie nach der Zahlung zur Anwendung zurück und melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an.';
+
+  @override
+  String get passwordConfirmationMismatch =>
+      'Passwort und Bestätigung stimmen nicht überein';
+
+  @override
+  String get vatNumber => 'USt-IdNr.';
+
+  @override
+  String get companyName => 'Unternehmen';
+
+  @override
+  String get firstName => 'Vorname';
+
+  @override
+  String get lastName => 'Name';
+
+  @override
+  String get addressLine1 => 'Adresse';
+
+  @override
+  String get postalCode => 'Postleitzahl';
+
+  @override
+  String get city => 'Stadt';
+
+  @override
+  String get country => 'Land';
+
+  @override
+  String get repeatPassword => 'Passwort wiederholen';
+
+  @override
+  String get requiredField => 'Pflichtfeld';
+
+  @override
+  String get invalidEmail => 'Ungültige E-Mail-Adresse';
+
+  @override
+  String get passwordMinLength =>
+      'Das Passwort muss mindestens 8 Zeichen enthalten';
+
+  @override
+  String get unableToOpenCheckout =>
+      'Die Zahlungsseite kann nicht geöffnet werden.';
+
+  @override
+  String get unableToOpenPortal =>
+      'Die Seite zur Abonnementverwaltung kann nicht geöffnet werden.';
 
   @override
   String get personalLicense => 'Persönliche Lizenz';

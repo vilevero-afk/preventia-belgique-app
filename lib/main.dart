@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'l10n/generated/app_localizations.dart';
+import 'screens/license_screen.dart';
 import 'services/app_config_service.dart';
 import 'services/app_locale_controller.dart';
+import 'services/license_service.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
@@ -14,9 +16,14 @@ Future<void> main() async {
 }
 
 class PreventiaBelgiqueApp extends StatelessWidget {
-  const PreventiaBelgiqueApp({required this.localeController, super.key});
+  PreventiaBelgiqueApp({
+    required this.localeController,
+    LicenseService? licenseService,
+    super.key,
+  }) : licenseService = licenseService ?? LicenseService();
 
   final AppLocaleController localeController;
+  final LicenseService licenseService;
 
   @override
   Widget build(BuildContext context) {
@@ -114,10 +121,55 @@ class PreventiaBelgiqueApp extends StatelessWidget {
                 floatingLabelStyle: const TextStyle(color: primary),
               ),
             ),
-            home: const HomeScreen(),
+            home: _StartupGate(licenseService: licenseService),
           );
         },
       ),
     );
+  }
+}
+
+class _StartupGate extends StatefulWidget {
+  const _StartupGate({required this.licenseService});
+
+  final LicenseService licenseService;
+
+  @override
+  State<_StartupGate> createState() => _StartupGateState();
+}
+
+class _StartupGateState extends State<_StartupGate> {
+  bool? _hasActiveSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    final hasActiveSession = await widget.licenseService.hasActiveSession();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _hasActiveSession = hasActiveSession);
+  }
+
+  void _openHome() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasActiveSession = _hasActiveSession;
+    if (hasActiveSession == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (hasActiveSession) {
+      return const HomeScreen();
+    }
+    return LicenseScreen(onContinue: _openHome);
   }
 }

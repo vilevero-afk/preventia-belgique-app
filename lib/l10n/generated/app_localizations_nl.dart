@@ -63,6 +63,23 @@ class AppLocalizationsNl extends AppLocalizations {
   String get logoutThisDevice => 'Dit apparaat afmelden';
 
   @override
+  String get confirmLogoutDeviceMessage =>
+      'Wilt u dit apparaat loskoppelen van uw PreventIA-licentie?';
+
+  @override
+  String get logoutBackendFailedMessage =>
+      'Afmelden bij de server is mislukt. U kunt de sessie nog steeds van dit apparaat verwijderen.';
+
+  @override
+  String get logoutLocally => 'Lokaal afmelden';
+
+  @override
+  String get deviceLoggedOut => 'Apparaat afgemeld.';
+
+  @override
+  String get continueToApp => 'Doorgaan naar de applicatie';
+
+  @override
   String get emailAddress => 'E-mailadres';
 
   @override
@@ -70,6 +87,82 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get signIn => 'Aanmelden';
+
+  @override
+  String get createLicense => 'Licentie aanmaken';
+
+  @override
+  String get createPreventiaLicenseTitle => 'PreventIA-licentie aanmaken';
+
+  @override
+  String get continueToPayment => 'Doorgaan naar betaling';
+
+  @override
+  String get primaryMonthlyLicense => 'Maandelijkse hoofdlicentie';
+
+  @override
+  String get primaryAnnualLicense => 'Jaarlijkse hoofdlicentie';
+
+  @override
+  String get additionalMonthlyLicense => 'Maandelijkse aanvullende licentie';
+
+  @override
+  String get additionalAnnualLicense => 'Jaarlijkse aanvullende licentie';
+
+  @override
+  String get manageSubscription => 'Mijn abonnement beheren';
+
+  @override
+  String get afterPaymentReturnToApp =>
+      'Keer na betaling terug naar de applicatie en meld u aan met uw e-mailadres en wachtwoord.';
+
+  @override
+  String get passwordConfirmationMismatch =>
+      'Wachtwoord en bevestiging verschillen';
+
+  @override
+  String get vatNumber => 'Btw-nummer';
+
+  @override
+  String get companyName => 'Onderneming';
+
+  @override
+  String get firstName => 'Voornaam';
+
+  @override
+  String get lastName => 'Naam';
+
+  @override
+  String get addressLine1 => 'Adres';
+
+  @override
+  String get postalCode => 'Postcode';
+
+  @override
+  String get city => 'Stad';
+
+  @override
+  String get country => 'Land';
+
+  @override
+  String get repeatPassword => 'Wachtwoord herhalen';
+
+  @override
+  String get requiredField => 'Verplicht veld';
+
+  @override
+  String get invalidEmail => 'Ongeldig e-mailadres';
+
+  @override
+  String get passwordMinLength =>
+      'Het wachtwoord moet minstens 8 tekens bevatten';
+
+  @override
+  String get unableToOpenCheckout => 'Kan de betaalpagina niet openen.';
+
+  @override
+  String get unableToOpenPortal =>
+      'Kan de pagina voor abonnementsbeheer niet openen.';
 
   @override
   String get personalLicense => 'Persoonlijke licentie';
