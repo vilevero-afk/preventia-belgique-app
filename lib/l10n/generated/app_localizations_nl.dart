@@ -160,6 +160,9 @@ class AppLocalizationsNl extends AppLocalizations {
   String get privacyPolicy => 'Privacybeleid';
 
   @override
+  String get cancellationAndRefund => 'Annulering en terugbetaling';
+
+  @override
   String get termsOfUseDraftText =>
       'Voorlopige tekst. De definitieve gebruiksvoorwaarden worden toegevoegd vóór de productierelease.';
 
@@ -207,6 +210,9 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get unableToOpenPortal =>
       'Kan de pagina voor abonnementsbeheer niet openen.';
+
+  @override
+  String get unableToOpenLegalPage => 'Kan de juridische pagina niet openen.';
 
   @override
   String get personalLicense => 'Persoonlijke licentie';

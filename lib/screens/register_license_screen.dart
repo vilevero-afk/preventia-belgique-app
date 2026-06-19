@@ -14,6 +14,16 @@ class RegisterLicenseScreen extends StatefulWidget {
 }
 
 class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
+  static final _termsUrl = Uri.parse(
+    'https://preventia-backend-gjhg.onrender.com/legal/terms',
+  );
+  static final _privacyUrl = Uri.parse(
+    'https://preventia-backend-gjhg.onrender.com/legal/privacy',
+  );
+  static final _cancellationUrl = Uri.parse(
+    'https://preventia-backend-gjhg.onrender.com/legal/cancellation',
+  );
+
   final _formKey = GlobalKey<FormState>();
   final _billingService = BillingService();
   final _firstNameController = TextEditingController();
@@ -239,10 +249,7 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
               ),
               _TextLinkButton(
                 label: l10n.termsOfUse,
-                onPressed: () => _showLegalDialog(
-                  title: l10n.termsOfUse,
-                  content: l10n.termsOfUseDraftText,
-                ),
+                onPressed: () => _openLegalUrl(_termsUrl),
               ),
               _ConsentCheckbox(
                 value: _acceptPrivacy,
@@ -255,10 +262,12 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
               ),
               _TextLinkButton(
                 label: l10n.privacyPolicy,
-                onPressed: () => _showLegalDialog(
-                  title: l10n.privacyPolicy,
-                  content: l10n.privacyPolicyDraftText,
-                ),
+                onPressed: () => _openLegalUrl(_privacyUrl),
+              ),
+              _TextLinkButton(
+                label: l10n.cancellationAndRefund,
+                onPressed: () => _openLegalUrl(_cancellationUrl),
+                isDiscrete: true,
               ),
               _helperText(l10n.licenseDataUseInfo),
               const SizedBox(height: 12),
@@ -314,22 +323,14 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
     );
   }
 
-  Future<void> _showLegalDialog({
-    required String title,
-    required String content,
-  }) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: SingleChildScrollView(child: Text(content)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(AppLocalizations.of(context).close),
-          ),
-        ],
-      ),
+  Future<void> _openLegalUrl(Uri url) async {
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!mounted || opened) {
+      return;
+    }
+    _showSnackBar(
+      AppLocalizations.of(context).unableToOpenLegalPage,
+      isError: true,
     );
   }
 
@@ -462,13 +463,19 @@ class _ConsentCheckbox extends StatelessWidget {
 }
 
 class _TextLinkButton extends StatelessWidget {
-  const _TextLinkButton({required this.label, required this.onPressed});
+  const _TextLinkButton({
+    required this.label,
+    required this.onPressed,
+    this.isDiscrete = false,
+  });
 
   final String label;
   final VoidCallback onPressed;
+  final bool isDiscrete;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Align(
       alignment: Alignment.centerLeft,
       child: TextButton(
@@ -478,7 +485,12 @@ class _TextLinkButton extends StatelessWidget {
           minimumSize: const Size(0, 36),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-        child: Text(label),
+        child: Text(
+          label,
+          style: isDiscrete
+              ? TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)
+              : null,
+        ),
       ),
     );
   }

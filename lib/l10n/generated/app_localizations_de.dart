@@ -162,6 +162,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get privacyPolicy => 'Datenschutzrichtlinie';
 
   @override
+  String get cancellationAndRefund => 'Stornierung und Rückerstattung';
+
+  @override
   String get termsOfUseDraftText =>
       'Vorläufiger Text. Die endgültigen Nutzungsbedingungen werden vor der Produktionsfreigabe integriert.';
 
@@ -210,6 +213,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get unableToOpenPortal =>
       'Die Seite zur Abonnementverwaltung kann nicht geöffnet werden.';
+
+  @override
+  String get unableToOpenLegalPage =>
+      'Die Rechtsseite kann nicht geöffnet werden.';
 
   @override
   String get personalLicense => 'Persönliche Lizenz';

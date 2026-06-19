@@ -390,6 +390,12 @@ abstract class AppLocalizations {
   /// **'Politique de confidentialité'**
   String get privacyPolicy;
 
+  /// No description provided for @cancellationAndRefund.
+  ///
+  /// In fr, this message translates to:
+  /// **'Annulation et remboursement'**
+  String get cancellationAndRefund;
+
   /// No description provided for @termsOfUseDraftText.
   ///
   /// In fr, this message translates to:
@@ -479,6 +485,12 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Impossible d’ouvrir la page de gestion d’abonnement.'**
   String get unableToOpenPortal;
+
+  /// No description provided for @unableToOpenLegalPage.
+  ///
+  /// In fr, this message translates to:
+  /// **'Impossible d’ouvrir la page légale.'**
+  String get unableToOpenLegalPage;
 
   /// No description provided for @personalLicense.
   ///

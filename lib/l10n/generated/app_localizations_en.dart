@@ -159,6 +159,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacyPolicy => 'Privacy policy';
 
   @override
+  String get cancellationAndRefund => 'Cancellation and refund';
+
+  @override
   String get termsOfUseDraftText =>
       'Draft text. The final terms of use will be added before production release.';
 
@@ -206,6 +209,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get unableToOpenPortal =>
       'Unable to open the subscription management page.';
+
+  @override
+  String get unableToOpenLegalPage => 'Unable to open the legal page.';
 
   @override
   String get personalLicense => 'Personal licence';
