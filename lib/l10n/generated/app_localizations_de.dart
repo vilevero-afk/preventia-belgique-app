@@ -125,6 +125,51 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vatNumber => 'USt-IdNr.';
 
   @override
+  String get vatNumberRequired => 'USt-IdNr. erforderlich';
+
+  @override
+  String get billingAddressRequired => 'Rechnungsadresse erforderlich';
+
+  @override
+  String get electronicInvoicing => 'Elektronische Rechnungsstellung';
+
+  @override
+  String get vatNumberBillingUseInfo =>
+      'Die USt-IdNr. wird zur Identifizierung des Unternehmens, für die Abrechnung und für Verpflichtungen im Zusammenhang mit der elektronischen Rechnungsstellung verwendet.';
+
+  @override
+  String get acceptTermsOfUse => 'Ich akzeptiere die Nutzungsbedingungen';
+
+  @override
+  String get readPrivacyPolicy => 'Ich habe die Datenschutzrichtlinie gelesen';
+
+  @override
+  String get mustAcceptTermsOfUse =>
+      'Sie müssen die Nutzungsbedingungen akzeptieren.';
+
+  @override
+  String get mustAcceptPrivacyPolicy =>
+      'Sie müssen die Datenschutzrichtlinie akzeptieren.';
+
+  @override
+  String get licenseDataUseInfo =>
+      'Ihre Daten werden ausschließlich verwendet, um Ihre Lizenz zu erstellen, Ihr Abonnement zu verwalten, die Abrechnung durchzuführen und den sicheren Zugriff auf die Anwendung zu ermöglichen.';
+
+  @override
+  String get termsOfUse => 'Nutzungsbedingungen';
+
+  @override
+  String get privacyPolicy => 'Datenschutzrichtlinie';
+
+  @override
+  String get termsOfUseDraftText =>
+      'Vorläufiger Text. Die endgültigen Nutzungsbedingungen werden vor der Produktionsfreigabe integriert.';
+
+  @override
+  String get privacyPolicyDraftText =>
+      'Vorläufiger Text. Die endgültige Datenschutzrichtlinie wird vor der Produktionsfreigabe integriert.';
+
+  @override
   String get companyName => 'Unternehmen';
 
   @override

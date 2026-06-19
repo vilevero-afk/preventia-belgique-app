@@ -124,6 +124,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vatNumber => 'VAT number';
 
   @override
+  String get vatNumberRequired => 'VAT number required';
+
+  @override
+  String get billingAddressRequired => 'Billing address required';
+
+  @override
+  String get electronicInvoicing => 'Electronic invoicing';
+
+  @override
+  String get vatNumberBillingUseInfo =>
+      'The VAT number is used to identify the company, for billing and for obligations related to electronic invoicing.';
+
+  @override
+  String get acceptTermsOfUse => 'I accept the terms of use';
+
+  @override
+  String get readPrivacyPolicy => 'I have read the privacy policy';
+
+  @override
+  String get mustAcceptTermsOfUse => 'You must accept the terms of use.';
+
+  @override
+  String get mustAcceptPrivacyPolicy => 'You must accept the privacy policy.';
+
+  @override
+  String get licenseDataUseInfo =>
+      'Your data is used only to create your licence, manage your subscription, billing and secure access to the application.';
+
+  @override
+  String get termsOfUse => 'Terms of use';
+
+  @override
+  String get privacyPolicy => 'Privacy policy';
+
+  @override
+  String get termsOfUseDraftText =>
+      'Draft text. The final terms of use will be added before production release.';
+
+  @override
+  String get privacyPolicyDraftText =>
+      'Draft text. The final privacy policy will be added before production release.';
+
+  @override
   String get companyName => 'Company';
 
   @override

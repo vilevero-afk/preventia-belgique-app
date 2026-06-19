@@ -124,6 +124,51 @@ class AppLocalizationsFr extends AppLocalizations {
   String get vatNumber => 'Numéro TVA';
 
   @override
+  String get vatNumberRequired => 'Numéro de TVA obligatoire';
+
+  @override
+  String get billingAddressRequired => 'Adresse de facturation obligatoire';
+
+  @override
+  String get electronicInvoicing => 'Facturation électronique';
+
+  @override
+  String get vatNumberBillingUseInfo =>
+      'Le numéro de TVA est utilisé pour l’identification de l’entreprise, la facturation et les obligations liées à la facturation électronique.';
+
+  @override
+  String get acceptTermsOfUse => 'J’accepte les conditions d’utilisation';
+
+  @override
+  String get readPrivacyPolicy => 'J’ai lu la politique de confidentialité';
+
+  @override
+  String get mustAcceptTermsOfUse =>
+      'Vous devez accepter les conditions d’utilisation.';
+
+  @override
+  String get mustAcceptPrivacyPolicy =>
+      'Vous devez accepter la politique de confidentialité.';
+
+  @override
+  String get licenseDataUseInfo =>
+      'Vos données sont utilisées uniquement pour créer votre licence, gérer votre abonnement, la facturation et l’accès sécurisé à l’application.';
+
+  @override
+  String get termsOfUse => 'Conditions d’utilisation';
+
+  @override
+  String get privacyPolicy => 'Politique de confidentialité';
+
+  @override
+  String get termsOfUseDraftText =>
+      'Texte provisoire. Les conditions d’utilisation définitives seront intégrées avant la mise en production.';
+
+  @override
+  String get privacyPolicyDraftText =>
+      'Texte provisoire. La politique de confidentialité définitive sera intégrée avant la mise en production.';
+
+  @override
   String get companyName => 'Entreprise';
 
   @override

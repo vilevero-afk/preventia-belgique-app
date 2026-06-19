@@ -32,6 +32,8 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
   String _selectedPlanId = 'primary_monthly';
   bool _isLoadingPlans = true;
   bool _isSubmitting = false;
+  bool _acceptTerms = false;
+  bool _acceptPrivacy = false;
 
   @override
   void initState() {
@@ -178,21 +180,26 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
                 controller: _vatNumberController,
                 label: l10n.vatNumber,
                 textInputAction: TextInputAction.next,
+                validator: _vatNumberValidator,
               ),
+              _helperText(l10n.vatNumberBillingUseInfo),
               _field(
                 controller: _addressLine1Controller,
                 label: l10n.addressLine1,
                 textInputAction: TextInputAction.next,
+                validator: _billingAddressValidator,
               ),
               _field(
                 controller: _postalCodeController,
                 label: l10n.postalCode,
                 textInputAction: TextInputAction.next,
+                validator: _requiredValidator,
               ),
               _field(
                 controller: _cityController,
                 label: l10n.city,
                 textInputAction: TextInputAction.next,
+                validator: _requiredValidator,
               ),
               _field(
                 controller: _countryController,
@@ -221,6 +228,39 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
                 textInputAction: TextInputAction.done,
                 validator: _passwordConfirmationValidator,
               ),
+              const SizedBox(height: 12),
+              _ConsentCheckbox(
+                value: _acceptTerms,
+                label: l10n.acceptTermsOfUse,
+                errorText: l10n.mustAcceptTermsOfUse,
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) => setState(() => _acceptTerms = value ?? false),
+              ),
+              _TextLinkButton(
+                label: l10n.termsOfUse,
+                onPressed: () => _showLegalDialog(
+                  title: l10n.termsOfUse,
+                  content: l10n.termsOfUseDraftText,
+                ),
+              ),
+              _ConsentCheckbox(
+                value: _acceptPrivacy,
+                label: l10n.readPrivacyPolicy,
+                errorText: l10n.mustAcceptPrivacyPolicy,
+                onChanged: _isSubmitting
+                    ? null
+                    : (value) =>
+                          setState(() => _acceptPrivacy = value ?? false),
+              ),
+              _TextLinkButton(
+                label: l10n.privacyPolicy,
+                onPressed: () => _showLegalDialog(
+                  title: l10n.privacyPolicy,
+                  content: l10n.privacyPolicyDraftText,
+                ),
+              ),
+              _helperText(l10n.licenseDataUseInfo),
               const SizedBox(height: 12),
               Text(l10n.plan, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
@@ -274,6 +314,25 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
     );
   }
 
+  Future<void> _showLegalDialog({
+    required String title,
+    required String content,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: Text(content)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(AppLocalizations.of(context).close),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _field({
     required TextEditingController controller,
     required String label,
@@ -298,9 +357,34 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
     );
   }
 
+  Widget _helperText(String text) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, right: 4, bottom: 12),
+      child: Text(
+        text,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+
   String? _requiredValidator(String? value) {
     return value == null || value.trim().isEmpty
         ? AppLocalizations.of(context).requiredField
+        : null;
+  }
+
+  String? _vatNumberValidator(String? value) {
+    return value == null || value.trim().isEmpty
+        ? AppLocalizations.of(context).vatNumberRequired
+        : null;
+  }
+
+  String? _billingAddressValidator(String? value) {
+    return value == null || value.trim().isEmpty
+        ? AppLocalizations.of(context).billingAddressRequired
         : null;
   }
 
@@ -320,6 +404,83 @@ class _RegisterLicenseScreenState extends State<RegisterLicenseScreen> {
     return value == _passwordController.text
         ? null
         : AppLocalizations.of(context).passwordConfirmationMismatch;
+  }
+}
+
+class _ConsentCheckbox extends StatelessWidget {
+  const _ConsentCheckbox({
+    required this.value,
+    required this.label,
+    required this.errorText,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final String label;
+  final String errorText;
+  final ValueChanged<bool?>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<bool>(
+      initialValue: value,
+      validator: (_) => value ? null : errorText,
+      builder: (field) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CheckboxListTile(
+                value: value,
+                onChanged: (newValue) {
+                  onChanged?.call(newValue);
+                  field.didChange(newValue);
+                },
+                title: Text(label),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+              if (field.hasError)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 8),
+                  child: Text(
+                    field.errorText!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TextLinkButton extends StatelessWidget {
+  const _TextLinkButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          minimumSize: const Size(0, 36),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Text(label),
+      ),
+    );
   }
 }
 

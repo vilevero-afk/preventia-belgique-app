@@ -51,10 +51,10 @@ class BillingService {
     required String firstName,
     required String lastName,
     required String companyName,
-    String? vatNumber,
-    String? addressLine1,
-    String? postalCode,
-    String? city,
+    required String vatNumber,
+    required String addressLine1,
+    required String postalCode,
+    required String city,
     String country = 'BE',
     required String planId,
   }) async {
@@ -71,12 +71,14 @@ class BillingService {
         'firstName': firstName.trim(),
         'lastName': lastName.trim(),
         'companyName': companyName.trim(),
-        'vatNumber': _nullableTrim(vatNumber),
-        'addressLine1': _nullableTrim(addressLine1),
-        'postalCode': _nullableTrim(postalCode),
-        'city': _nullableTrim(city),
+        'vatNumber': vatNumber.trim(),
+        'addressLine1': addressLine1.trim(),
+        'postalCode': postalCode.trim(),
+        'city': city.trim(),
         'country': country.trim().isEmpty ? 'BE' : country.trim(),
         'planId': planId,
+        'acceptTerms': true,
+        'acceptPrivacy': true,
       }),
     );
     final decoded = _decodeResponse(response);
@@ -141,11 +143,6 @@ class BillingService {
       return value.trim();
     }
     throw BillingException(fallbackMessage);
-  }
-
-  static String? _nullableTrim(String? value) {
-    final trimmed = value?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   static String? _messageFrom(Map<String, dynamic> decoded) {

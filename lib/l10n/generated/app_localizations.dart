@@ -324,6 +324,84 @@ abstract class AppLocalizations {
   /// **'Numéro TVA'**
   String get vatNumber;
 
+  /// No description provided for @vatNumberRequired.
+  ///
+  /// In fr, this message translates to:
+  /// **'Numéro de TVA obligatoire'**
+  String get vatNumberRequired;
+
+  /// No description provided for @billingAddressRequired.
+  ///
+  /// In fr, this message translates to:
+  /// **'Adresse de facturation obligatoire'**
+  String get billingAddressRequired;
+
+  /// No description provided for @electronicInvoicing.
+  ///
+  /// In fr, this message translates to:
+  /// **'Facturation électronique'**
+  String get electronicInvoicing;
+
+  /// No description provided for @vatNumberBillingUseInfo.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le numéro de TVA est utilisé pour l’identification de l’entreprise, la facturation et les obligations liées à la facturation électronique.'**
+  String get vatNumberBillingUseInfo;
+
+  /// No description provided for @acceptTermsOfUse.
+  ///
+  /// In fr, this message translates to:
+  /// **'J’accepte les conditions d’utilisation'**
+  String get acceptTermsOfUse;
+
+  /// No description provided for @readPrivacyPolicy.
+  ///
+  /// In fr, this message translates to:
+  /// **'J’ai lu la politique de confidentialité'**
+  String get readPrivacyPolicy;
+
+  /// No description provided for @mustAcceptTermsOfUse.
+  ///
+  /// In fr, this message translates to:
+  /// **'Vous devez accepter les conditions d’utilisation.'**
+  String get mustAcceptTermsOfUse;
+
+  /// No description provided for @mustAcceptPrivacyPolicy.
+  ///
+  /// In fr, this message translates to:
+  /// **'Vous devez accepter la politique de confidentialité.'**
+  String get mustAcceptPrivacyPolicy;
+
+  /// No description provided for @licenseDataUseInfo.
+  ///
+  /// In fr, this message translates to:
+  /// **'Vos données sont utilisées uniquement pour créer votre licence, gérer votre abonnement, la facturation et l’accès sécurisé à l’application.'**
+  String get licenseDataUseInfo;
+
+  /// No description provided for @termsOfUse.
+  ///
+  /// In fr, this message translates to:
+  /// **'Conditions d’utilisation'**
+  String get termsOfUse;
+
+  /// No description provided for @privacyPolicy.
+  ///
+  /// In fr, this message translates to:
+  /// **'Politique de confidentialité'**
+  String get privacyPolicy;
+
+  /// No description provided for @termsOfUseDraftText.
+  ///
+  /// In fr, this message translates to:
+  /// **'Texte provisoire. Les conditions d’utilisation définitives seront intégrées avant la mise en production.'**
+  String get termsOfUseDraftText;
+
+  /// No description provided for @privacyPolicyDraftText.
+  ///
+  /// In fr, this message translates to:
+  /// **'Texte provisoire. La politique de confidentialité définitive sera intégrée avant la mise en production.'**
+  String get privacyPolicyDraftText;
+
   /// No description provided for @companyName.
   ///
   /// In fr, this message translates to:

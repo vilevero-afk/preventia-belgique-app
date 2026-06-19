@@ -124,6 +124,50 @@ class AppLocalizationsNl extends AppLocalizations {
   String get vatNumber => 'Btw-nummer';
 
   @override
+  String get vatNumberRequired => 'Btw-nummer verplicht';
+
+  @override
+  String get billingAddressRequired => 'Facturatieadres verplicht';
+
+  @override
+  String get electronicInvoicing => 'Elektronische facturatie';
+
+  @override
+  String get vatNumberBillingUseInfo =>
+      'Het btw-nummer wordt gebruikt voor de identificatie van de onderneming, de facturatie en de verplichtingen rond elektronische facturatie.';
+
+  @override
+  String get acceptTermsOfUse => 'Ik aanvaard de gebruiksvoorwaarden';
+
+  @override
+  String get readPrivacyPolicy => 'Ik heb het privacybeleid gelezen';
+
+  @override
+  String get mustAcceptTermsOfUse =>
+      'U moet de gebruiksvoorwaarden aanvaarden.';
+
+  @override
+  String get mustAcceptPrivacyPolicy => 'U moet het privacybeleid aanvaarden.';
+
+  @override
+  String get licenseDataUseInfo =>
+      'Uw gegevens worden uitsluitend gebruikt om uw licentie aan te maken, uw abonnement te beheren, voor facturatie en voor beveiligde toegang tot de applicatie.';
+
+  @override
+  String get termsOfUse => 'Gebruiksvoorwaarden';
+
+  @override
+  String get privacyPolicy => 'Privacybeleid';
+
+  @override
+  String get termsOfUseDraftText =>
+      'Voorlopige tekst. De definitieve gebruiksvoorwaarden worden toegevoegd vóór de productierelease.';
+
+  @override
+  String get privacyPolicyDraftText =>
+      'Voorlopige tekst. Het definitieve privacybeleid wordt toegevoegd vóór de productierelease.';
+
+  @override
   String get companyName => 'Onderneming';
 
   @override
