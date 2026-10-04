@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/generated/app_localizations.dart';
+import '../models/preventia_project.dart';
 import '../models/document_type.dart';
 import '../models/prevention_document_config.dart';
 import '../services/license_service.dart';
+import '../services/preventia_project_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/language_selector.dart';
 import 'ai_settings_screen.dart';
@@ -12,9 +14,25 @@ import 'document_type_screen.dart';
 import 'history_screen.dart';
 import 'license_screen.dart';
 import 'limits_screen.dart';
+import 'piu_form_screen.dart';
+import 'preventia_project_screen.dart';
+import 'risk_assessment_assistant_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late Future<PreventiaProject?> _projectFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _projectFuture = PreventiaProjectService().getCurrentProject();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +98,7 @@ class HomeScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 20),
                         FilledButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
@@ -89,6 +107,17 @@ class HomeScreen extends StatelessWidget {
                           ),
                           icon: const Icon(Icons.health_and_safety_outlined),
                           label: Text(l10n.riskAssessment),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  const RiskAssessmentAssistantScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.playlist_add_check),
+                          label: const Text('Nouvelle analyse assistée'),
                         ),
                         const SizedBox(height: 20),
                         Text(
@@ -124,6 +153,25 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                         const SizedBox(height: 12),
+                        Text(
+                          l10n.emergencyDocuments,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const PiuFormScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.emergency_outlined),
+                          label: const Text('Plan Interne d’Urgence — PIU'),
+                        ),
+                        const SizedBox(height: 12),
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
@@ -152,6 +200,17 @@ class HomeScreen extends StatelessWidget {
                           ),
                           icon: const Icon(Icons.settings_outlined),
                           label: Text(l10n.aiSettings),
+                        ),
+                        const SizedBox(height: 12),
+                        FutureBuilder<PreventiaProject?>(
+                          future: _projectFuture,
+                          builder: (context, snapshot) => _projectAccess(
+                            context,
+                            snapshot.data,
+                            waiting:
+                                snapshot.connectionState ==
+                                ConnectionState.waiting,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextButton.icon(
@@ -183,6 +242,52 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _projectAccess(
+    BuildContext context,
+    PreventiaProject? project, {
+    required bool waiting,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!waiting && project == null) ...[
+          Text(
+            'Après la première analyse de risques, PreventIA vous proposera '
+            'de choisir où créer le dossier local de la société.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            icon: waiting
+                ? const Icon(Icons.hourglass_empty)
+                : const Icon(Icons.folder_copy_outlined),
+            label: Text(
+              project == null
+                  ? 'Dossier PreventIA'
+                  : 'Dossier PreventIA — ${project.companyName} / ${project.siteName}',
+            ),
+            onPressed: waiting ? null : _openProjectScreen,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openProjectScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PreventiaProjectScreen()),
+    );
+    if (!mounted) return;
+    setState(() {
+      _projectFuture = PreventiaProjectService().getCurrentProject();
+    });
+  }
+
   IconData _iconFor(DocumentType type) {
     return switch (type.icon) {
       'plan' => Icons.event_note_outlined,
@@ -191,6 +296,7 @@ class HomeScreen extends StatelessWidget {
       'job' => Icons.badge_outlined,
       'instruction' => Icons.assignment_outlined,
       'incident' => Icons.report_problem_outlined,
+      'emergency' => Icons.emergency_outlined,
       _ => Icons.description_outlined,
     };
   }
