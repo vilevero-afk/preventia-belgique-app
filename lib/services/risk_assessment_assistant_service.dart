@@ -158,6 +158,91 @@ class RiskAssessmentAssistantService {
     return questions.map(FieldQuestion.new).toList();
   }
 
+  static void fillErgonomicsTest(List<FieldQuestion> questions) {
+    const data = [
+      (
+        'non',
+        'Les écrans sont placés à des hauteurs différentes et aucun réglage systématique n’est vérifié.',
+        'Photo du poste et observation de la hauteur écran.',
+        true,
+        'élevée',
+      ),
+      (
+        'non',
+        'Les chaises sont réglables mais aucun contrôle du réglage individuel n’est réalisé.',
+        'Photo de la chaise et observation du réglage.',
+        true,
+        'élevée',
+      ),
+      (
+        'non',
+        'Le clavier et la souris sont positionnés selon les habitudes de chacun, sans vérification ergonomique.',
+        'Photo du plan de travail.',
+        true,
+        'moyenne',
+      ),
+      (
+        'oui',
+        'Des reflets sont possibles sur les postes proches des fenêtres.',
+        'Photo montrant les reflets ou l’orientation du poste.',
+        true,
+        'élevée',
+      ),
+      (
+        'oui',
+        'Des câbles visibles peuvent gêner les déplacements autour de certains postes.',
+        'Photo des câbles ou zones encombrées.',
+        true,
+        'élevée',
+      ),
+      (
+        'oui',
+        'Certains travailleurs utilisent un ordinateur portable sans support, clavier séparé ou souris adaptée.',
+        'Photo du poste avec ordinateur portable.',
+        true,
+        'moyenne',
+      ),
+      (
+        'non',
+        'Les postes en télétravail ne sont pas vérifiés de manière systématique.',
+        'Questionnaire télétravail ou déclaration du travailleur.',
+        false,
+        'moyenne',
+      ),
+      (
+        'oui',
+        'Des inconforts doivent être considérés comme possibles et vérifiés auprès des travailleurs.',
+        'Retour travailleur, questionnaire ou signalement RH.',
+        false,
+        'élevée',
+      ),
+      (
+        'non',
+        'Les pauses sont informelles et aucune alternance structurée des tâches n’est prévue.',
+        'Organisation du travail ou échange avec la ligne hiérarchique.',
+        false,
+        'moyenne',
+      ),
+      (
+        'oui',
+        'L’open space et les appels téléphoniques peuvent gêner la concentration.',
+        'Observation terrain ou retour travailleurs.',
+        false,
+        'moyenne',
+      ),
+    ];
+    for (var i = 0; i < questions.length && i < data.length; i++) {
+      final q = questions[i];
+      final item = data[i];
+      q.answer = item.$1;
+      q.comment = item.$2;
+      q.evidenceExpected = item.$3;
+      q.photoRequired = item.$4;
+      q.importance = item.$5;
+      q.status = 'vérifié';
+    }
+  }
+
   static List<AssistantDanger> dangersFor(String subject) {
     final dangers = switch (_category(subject)) {
       'ergonomie' => [
@@ -239,9 +324,44 @@ class RiskAssessmentAssistantService {
           ? 'À déterminer après observation et cotation complète.'
           : priority.join('\n'),
       'Actions proposées': [
-        ...questions
-            .where((q) => q.answer == 'non')
-            .map((q) => 'Action proposée : vérifier ou corriger — ${q.text}.'),
+        ...questions.where((q) => q.answer == 'non').map((q) {
+          final text = q.text.toLowerCase();
+          if (text.contains('hauteur de l’écran')) {
+            return 'Adapter la hauteur des écrans.';
+          }
+          if (text.contains('chaise')) {
+            return 'Vérifier le réglage des chaises.';
+          }
+          if (text.contains('télétravail')) {
+            return 'Vérifier les postes en télétravail.';
+          }
+          if (text.contains('pauses')) {
+            return 'Organiser des pauses ou alternances de tâches.';
+          }
+          return 'Action proposée : vérifier ou corriger — ${q.text}.';
+        }),
+        if (questions.any(
+          (q) => q.text.contains('chaise') && q.answer == 'non',
+        ))
+          'Former le personnel aux réglages du poste écran.',
+        if (questions.any(
+          (q) => q.text.contains('reflets') && q.answer == 'oui',
+        ))
+          'Corriger les reflets et mesurer l’éclairage.',
+        if (questions.any(
+          (q) => q.text.contains('câbles') && q.answer == 'oui',
+        ))
+          'Sécuriser les câbles au poste accueil ou autour des postes.',
+        if (questions.any(
+          (q) => q.text.contains('ordinateur portable') && q.answer == 'oui',
+        ))
+          'Fournir supports écran, clavier et souris adaptés.',
+        if (questions.any(
+          (q) => q.text.contains('douleurs') && q.answer == 'oui',
+        ))
+          'Collecter les plaintes ou inconforts liés au dos, à la nuque, aux épaules ou aux poignets.',
+        if (questions.any((q) => q.text.contains('bruit') && q.answer == 'oui'))
+          'Évaluer la gêne sonore en open space.',
         ...dangers.map(
           (d) =>
               'Vérifier ${d.danger} sur le terrain et définir les mesures adaptées.',

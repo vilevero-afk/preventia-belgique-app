@@ -4,6 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/risk_assessment_assistant_service.dart';
 import '../services/preventia_company_project_service.dart';
+import '../models/preventia_company_project.dart';
+import '../services/docx_export_service.dart';
+import '../services/file_export_service.dart';
 
 class RiskAssessmentAssistantScreen extends StatefulWidget {
   const RiskAssessmentAssistantScreen({super.key});
@@ -58,6 +61,29 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       onChanged: onChanged,
     ),
   );
+
+  bool get _isErgonomics =>
+      _subject.text.toLowerCase().contains('ergonomie') ||
+      _subject.text.toLowerCase().contains('écran') ||
+      _subject.text.toLowerCase().contains('ecran') ||
+      _subject.text.toLowerCase().contains('poste écran');
+
+  void _fillErgonomicsTest() {
+    if (_questions.isEmpty) {
+      _seed(
+        _subject.text.trim().isEmpty
+            ? 'Ergonomie poste écran'
+            : _subject.text.trim(),
+      );
+    }
+    RiskAssessmentAssistantService.fillErgonomicsTest(_questions);
+    _conclusions
+      ..clear()
+      ..addAll(
+        RiskAssessmentAssistantService.conclusionsFor(_questions, _dangers),
+      );
+    setState(() {});
+  }
 
   void _next() {
     if (_step == 0) {
@@ -139,6 +165,13 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                   )
                   .toList(),
             ),
+            if (_isErgonomics) ...[
+              OutlinedButton.icon(
+                onPressed: _fillErgonomicsTest,
+                icon: const Icon(Icons.science_outlined),
+                label: const Text('Remplir test ergonomie — rien n’est fait'),
+              ),
+            ],
             if (_seededSubject != null) ...[
               Text(
                 'Propositions actuelles : $_seededSubject. Les modifications sont conservées tant que vous ne renouvelez pas les propositions.',
@@ -359,6 +392,12 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                   onChanged: (v) => setState(() => _decisions[label] = v!),
                 ),
               ),
+            OutlinedButton.icon(
+              onPressed: _saving ? null : _exportWord,
+              icon: const Icon(Icons.download_outlined),
+              label: const Text('Exporter Word'),
+            ),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: _saving ? null : _saveToCompanyFolder,
               icon: const Icon(Icons.folder_copy_outlined),
@@ -394,6 +433,58 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
           onChanged: (v) => setState(() => change(v)),
         ),
       );
+
+  Future<void> _exportWord() async {
+    final subject = _subject.text.trim();
+    if (subject.isEmpty || _questions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Créez d’abord le brouillon d’analyse assistée.'),
+        ),
+      );
+      return;
+    }
+    final markdown = RiskAssessmentAssistantService.draft(
+      subject: subject,
+      answers: _answers,
+      questions: _questions,
+      dangers: _dangers,
+      conclusions: _conclusions,
+      decisions: _decisions,
+    );
+    final now = DateTime.now();
+    final document = PreventiaCompanyDocument(
+      id: 'assistant-export',
+      documentType: 'Analyse assistée de risques',
+      title: 'Analyse assistée — $subject',
+      status: 'Brouillon à valider',
+      createdAt: now,
+      autoCreated: false,
+      source: 'assistant_local',
+      markdown: markdown,
+      reference: '',
+      companyName: '',
+      formData: {'subject': subject},
+    );
+    final bytes = DocxExportService.buildAssistedRiskAssessmentDocx(document);
+    String slug(String value) => value
+        .toLowerCase()
+        .replaceAll(
+          RegExp(r'[^a-z0-9àâçéèêëîïôöùûüÿœ]+', caseSensitive: false),
+          '_',
+        )
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    final name =
+        'analyse_assistee_${slug(subject)}_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.docx';
+    await FileExportService.saveDocxBytes(
+      bytes: bytes,
+      suggestedFileName: name,
+      context: context,
+      successMessage: 'Document Word généré.',
+      errorMessage: 'Impossible de générer le document Word.',
+      showResultMessage: true,
+    );
+  }
 
   Future<void> _createDraft() async {
     setState(() => _saving = true);
