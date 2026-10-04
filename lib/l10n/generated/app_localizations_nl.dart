@@ -24,6 +24,24 @@ class AppLocalizationsNl extends AppLocalizations {
   String get preventionDocuments => 'Preventiedocumenten';
 
   @override
+  String get emergencyDocuments => 'Nooddocumenten';
+
+  @override
+  String get piuTitle => 'Intern noodplan — PIU';
+
+  @override
+  String get piuDescription =>
+      'Hulp bij het opstellen van een operationeel noodplan met contacten, procedures, evacuatie, reflexfiches en validaties.';
+
+  @override
+  String get piuOperationalHelp =>
+      'Het gegenereerde PIU is een operationeel hulpmiddel. Het moet worden aangevuld, ter plaatse gecontroleerd, aan de werkelijke middelen aangepast en vóór verspreiding gevalideerd.';
+
+  @override
+  String get piuShortAnswersHelp =>
+      'Geef korte antwoorden. Lege velden worden opgenomen als [aan te vullen].';
+
+  @override
   String get generalRiskAnalysis => 'Algemene risicoanalyse';
 
   @override
@@ -84,6 +102,18 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get password => 'Wachtwoord';
+
+  @override
+  String get rememberMe => 'Onthoud mij';
+
+  @override
+  String get showPassword => 'Wachtwoord tonen';
+
+  @override
+  String get hidePassword => 'Wachtwoord verbergen';
+
+  @override
+  String get sessionExpired => 'Sessie verlopen, meld u opnieuw aan';
 
   @override
   String get signIn => 'Aanmelden';

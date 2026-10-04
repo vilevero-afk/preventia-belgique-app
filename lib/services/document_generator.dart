@@ -131,13 +131,13 @@ $mandatoryValidationNotice
   }
 
   String _generatePreventionDocument(DocumentFormData data) {
-    final localeName = data.extraFields['_localeName'] ?? 'fr';
+    final localeName = data.extraFields['_localeName']?.toString() ?? 'fr';
     final texts = _localPreventionTexts(localeName);
     final fields = data.extraFields.entries
         .where((entry) => !entry.key.startsWith('_'))
         .map(
           (entry) =>
-              '- ${_humanizeKey(entry.key)} : ${_value(entry.value, texts.missingValue)}',
+              '- ${_humanizeKey(entry.key)} : ${_value(entry.value.toString(), texts.missingValue)}',
         )
         .join('\n');
     final actions = _actionLines(data.extraFields, texts.defaultActionLine);
@@ -256,7 +256,7 @@ ${texts.validationNotice}
     String key, [
     String missingValue = 'À compléter',
   ]) {
-    return _value(data.extraFields[key] ?? '', missingValue);
+    return _value(data.extraFields[key]?.toString() ?? '', missingValue);
   }
 
   String _humanizeKey(String key) {
@@ -267,16 +267,20 @@ ${texts.validationNotice}
     return spaced[0].toUpperCase() + spaced.substring(1);
   }
 
-  String _actionLines(Map<String, String> fields, String defaultActionLine) {
-    final candidates = [
-      fields['plannedActions'],
-      fields['proposedActions'],
-      fields['correctiveActions'],
-      fields['preventiveActions'],
-      fields['preventionMeasures'],
-      fields['beforeInstructions'],
-      fields['duringInstructions'],
-    ].where((value) => value != null && value.trim().isNotEmpty).toList();
+  String _actionLines(Map<String, dynamic> fields, String defaultActionLine) {
+    final candidates =
+        [
+              fields['plannedActions'],
+              fields['proposedActions'],
+              fields['correctiveActions'],
+              fields['preventiveActions'],
+              fields['preventionMeasures'],
+              fields['beforeInstructions'],
+              fields['duringInstructions'],
+            ]
+            .map((value) => value?.toString())
+            .where((value) => value != null && value.trim().isNotEmpty)
+            .toList();
     if (candidates.isEmpty) {
       return '- $defaultActionLine';
     }

@@ -111,6 +111,7 @@ class LicenseService {
   static const _cachedStatusStorageKey = 'license_cached_status';
   static const _authTokenStorageKey = 'authToken';
   static const _emailStorageKey = 'email';
+  static const _rememberMeStorageKey = 'rememberMe';
   static const _authDeviceIdStorageKey = 'deviceId';
   static const _authCachedStatusStorageKey = 'cachedLicenseStatus';
 
@@ -138,11 +139,25 @@ class LicenseService {
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
-  Future<String?> getEmail() async {
+  Future<bool> getRememberMe() async {
+    final value = await _readStorage(_rememberMeStorageKey);
+    final rememberMe = value?.trim().toLowerCase() == 'true';
+    debugPrint('rememberMe $rememberMe');
+    return rememberMe;
+  }
+
+  Future<void> setRememberMe(bool value) {
+    debugPrint('rememberMe $value');
+    return _writeStorage(_rememberMeStorageKey, value.toString());
+  }
+
+  Future<String?> getSavedEmail() async {
     final value = await _readStorage(_emailStorageKey);
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
+
+  Future<String?> getEmail() => getSavedEmail();
 
   Future<String?> getLicenseKey() async {
     final value = await _readStorage(_licenseKeyStorageKey);
@@ -159,10 +174,13 @@ class LicenseService {
     await _deleteStorage(_cachedStatusStorageKey);
   }
 
-  Future<void> clearSession() async {
+  Future<void> clearSession({bool keepRememberedEmail = false}) async {
     await _deleteStorage(_authTokenStorageKey);
-    await _deleteStorage(_emailStorageKey);
     await _deleteStorage(_authCachedStatusStorageKey);
+    await _deleteStorage(_cachedStatusStorageKey);
+    if (!keepRememberedEmail || !await getRememberMe()) {
+      await _deleteStorage(_emailStorageKey);
+    }
     debugPrint('logout local session cleared');
   }
 
@@ -171,6 +189,11 @@ class LicenseService {
   }
 
   Future<bool> hasActiveSession() async {
+    final rememberMe = await getRememberMe();
+    if (!rememberMe) {
+      await clearSession();
+      return false;
+    }
     final token = await getAuthToken();
     debugPrint('auth token exists ${token == null ? 'no' : 'yes'}');
     if (token == null) {
@@ -188,7 +211,7 @@ class LicenseService {
       return false;
     } on LicenseException catch (error) {
       debugPrint('License session check rejected: ${error.message}');
-      await clearSession();
+      await clearSession(keepRememberedEmail: true);
       return false;
     } on Object catch (error) {
       debugPrint('License session check unavailable: $error');
@@ -196,7 +219,11 @@ class LicenseService {
     }
   }
 
-  Future<LicenseStatus> login(String email, String password) async {
+  Future<LicenseStatus> login(
+    String email,
+    String password,
+    bool rememberMe,
+  ) async {
     final normalizedEmail = email.trim();
     if (normalizedEmail.isEmpty || password.isEmpty) {
       throw const LicenseException('Connexion requise.');
@@ -211,15 +238,22 @@ class LicenseService {
       'appVersion': _appVersion(),
     });
     if (decoded['success'] == false) {
-      throw LicenseException(_messageFrom(decoded) ?? 'Connexion refusée.');
+      throw LicenseException(
+        _loginErrorMessage(decoded) ?? 'Email ou mot de passe incorrect.',
+      );
     }
     final token = _tokenFrom(decoded);
     debugPrint('login success token received ${token == null ? 'no' : 'yes'}');
     if (token == null) {
       throw const LicenseException('Réponse de connexion invalide.');
     }
+    await setRememberMe(rememberMe);
     await _writeStorage(_authTokenStorageKey, token);
-    await _writeStorage(_emailStorageKey, normalizedEmail);
+    if (rememberMe) {
+      await _writeStorage(_emailStorageKey, normalizedEmail);
+    } else {
+      await _deleteStorage(_emailStorageKey);
+    }
     final status = LicenseStatus.fromJson({
       ...decoded,
       'email': decoded['email'] ?? normalizedEmail,
@@ -296,6 +330,7 @@ class LicenseService {
   }
 
   Future<void> logoutThisDevice({bool localOnly = false}) async {
+    final rememberMe = await getRememberMe();
     final token = await getAuthToken();
     if (token != null) {
       if (!localOnly) {
@@ -308,7 +343,7 @@ class LicenseService {
           debugPrint('License logout unavailable: $error');
         }
       }
-      await clearSession();
+      await clearSession(keepRememberedEmail: rememberMe);
       return;
     }
     final licenseKey = await getLicenseKey();
@@ -342,7 +377,7 @@ class LicenseService {
       return await _readCachedStatus();
     } on LicenseException catch (error) {
       debugPrint('License status rejected: ${error.message}');
-      await clearSession();
+      await clearSession(keepRememberedEmail: await getRememberMe());
       return null;
     } on Object catch (error) {
       debugPrint('License status unavailable: $error');
@@ -458,7 +493,7 @@ class LicenseService {
     debugPrint('/api/auth/me status code: ${response.statusCode}');
     debugPrint('/api/auth/me body: ${_redactedBody(response.body)}');
     if (response.statusCode == 401 || response.statusCode == 403) {
-      await clearSession();
+      await clearSession(keepRememberedEmail: await getRememberMe());
       return null;
     }
     final decoded = response.body.isEmpty
@@ -471,7 +506,7 @@ class LicenseService {
       return null;
     }
     if (decoded['success'] != true) {
-      await clearSession();
+      await clearSession(keepRememberedEmail: await getRememberMe());
       return null;
     }
     final email = await getEmail();
@@ -590,6 +625,21 @@ class LicenseService {
       }
     }
     return null;
+  }
+
+  static String? _loginErrorMessage(Map<String, dynamic> decoded) {
+    final message = _messageFrom(decoded);
+    if (message == null) {
+      return null;
+    }
+    final normalized = message.toLowerCase();
+    if (normalized.contains('identifiant') ||
+        normalized.contains('incorrect') ||
+        normalized.contains('invalide') ||
+        normalized.contains('mot de passe')) {
+      return 'Email ou mot de passe incorrect.';
+    }
+    return message;
   }
 
   static String? _tokenFrom(Map<String, dynamic> decoded) {

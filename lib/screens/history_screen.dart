@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as path;
 
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/pdf_texts.dart';
 import '../models/document_family.dart';
 import '../models/analysis_project.dart';
 import '../models/saved_document.dart';
+import '../models/preventia_company_project.dart';
 import '../services/action_summary_pdf_service.dart';
 import '../services/action_summary_service.dart';
 import '../services/docx_export_service.dart';
@@ -13,9 +15,23 @@ import '../services/file_export_service.dart';
 import '../services/local_document_storage.dart';
 import '../services/pdf_delivery_service.dart';
 import '../services/pdf_export_service.dart';
+import '../services/preventia_document_storage_service.dart';
+import '../services/preventia_project_service.dart';
+import '../services/preventia_company_project_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/simple_markdown_document_view.dart';
 import 'action_summary_screen.dart';
+import 'company_folder_detail_screen.dart';
+
+Future<List<PreventiaCompanyProject>> loadPreventiaCompaniesForHistory() async {
+  final service = PreventiaCompanyProjectService();
+  await service.repairEmptyProjectsFromLegacyHistory();
+  return service.getProjects(migrateLegacy: false);
+}
+
+List<String> companyHistoryRootLabels(
+  Iterable<PreventiaCompanyProject> projects,
+) => projects.map((project) => project.companyName).toList(growable: false);
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -25,7 +41,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  late Future<_HistoryData> _historyFuture;
+  late Future<List<PreventiaCompanyProject>> _historyFuture;
 
   @override
   void initState() {
@@ -39,24 +55,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
-  Future<_HistoryData> _loadHistory() async {
-    final storage = LocalDocumentStorage();
-    final projects = await storage.loadProjects();
-    final documents = await storage.loadDocuments();
-    final projectDocumentIds = projects
-        .expand(
-          (project) => [
-            project.analysisDocumentId,
-            if (project.actionSummaryDocumentId != null)
-              project.actionSummaryDocumentId!,
-            ...project.linkedDocumentIds,
-          ],
-        )
-        .toSet();
-    final standaloneDocuments = documents
-        .where((document) => !projectDocumentIds.contains(document.id))
-        .toList();
-    return _HistoryData(projects: projects, documents: standaloneDocuments);
+  Future<List<PreventiaCompanyProject>> _loadHistory() =>
+      loadPreventiaCompaniesForHistory();
+
+  Future<void> _openCompany(PreventiaCompanyProject project) async {
+    debugPrint(
+      '[PreventIA] opening company folder companyKey=${project.companyKey} '
+      'companyName=${project.companyName} analyses=${project.analyses.length} '
+      'documents=${project.documents.length}',
+    );
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            CompanyFolderDetailScreen(companyKey: project.companyKey),
+      ),
+    );
+    if (mounted) _reloadDocuments();
+  }
+
+  Future<void> _deleteCompany(PreventiaCompanyProject project) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Supprimer le dossier ${project.companyName} ?'),
+        content: const Text(
+          'Cette action supprime uniquement le dossier de l’historique '
+          'PreventIA. Aucun fichier de votre Mac ne sera supprimé.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Supprimer de l’historique'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await PreventiaCompanyProjectService().deleteProjectFromHistory(
+      project.companyKey,
+    );
+    await _loadHistory();
+    if (mounted) _reloadDocuments();
   }
 
   @override
@@ -64,15 +108,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.history)),
-      body: FutureBuilder<_HistoryData>(
+      body: FutureBuilder<List<PreventiaCompanyProject>>(
         future: _historyFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final history = snapshot.data ?? const _HistoryData();
-          if (history.projects.isEmpty && history.documents.isEmpty) {
+          final companies = snapshot.data ?? const [];
+          if (companies.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -81,57 +125,53 @@ class _HistoryScreenState extends State<HistoryScreen> {
             );
           }
 
-          final itemCount = history.projects.length + history.documents.length;
           return AdaptivePage(
             child: ListView.separated(
               padding: EdgeInsets.zero,
-              itemCount: itemCount,
+              itemCount: companies.length,
               separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
-                if (index < history.projects.length) {
-                  final project = history.projects[index];
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.folder_outlined),
-                      title: Text(project.name),
-                      subtitle: Text(l10n.analysisFolderSubtitle),
-                      isThreeLine: true,
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                AnalysisProjectScreen(project: project),
-                          ),
-                        );
-                        if (context.mounted) {
-                          _reloadDocuments();
-                        }
-                      },
-                    ),
-                  );
-                }
-
-                final document =
-                    history.documents[index - history.projects.length];
+                final company = companies[index];
+                final openActions = company.actionItems
+                    .where(
+                      (item) =>
+                          item.status != 'validé' && item.status != 'ignoré',
+                    )
+                    .length;
                 return Card(
-                  child: ListTile(
-                    title: Text(document.title),
-                    subtitle: Text(_historySubtitle(document)),
-                    isThreeLine:
-                        document.isModifiedLocally || document.isActionSummary,
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              SavedDocumentDetailScreen(document: document),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ListTile(
+                        key: Key('company-history-${company.companyKey}'),
+                        leading: const Icon(Icons.business_outlined),
+                        title: Text(company.companyName),
+                        subtitle: Text(
+                          'Analyses de risques : ${company.analyses.length}\n'
+                          'PIU : ${company.piuDocument == null ? 'absent' : 'créé'}\n'
+                          'PGA/PAA/PGP : ${company.pgaDocument == null ? 'absent' : 'créé'}\n'
+                          'Actions candidates : $openActions\n'
+                          'Dernière mise à jour : ${_formatCompanyDate(company.updatedAt)}',
                         ),
-                      );
-                      if (context.mounted) {
-                        _reloadDocuments();
-                      }
-                    },
+                        isThreeLine: true,
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _openCompany(company),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            key: Key(
+                              'delete-company-history-${company.companyKey}',
+                            ),
+                            onPressed: () => _deleteCompany(company),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Supprimer'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -142,22 +182,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  String _historySubtitle(SavedDocument document) {
-    if (document.isActionSummary) {
-      return 'Récapitulatif lié à ${document.sourceDocumentTitle ?? 'une analyse locale'}';
-    }
-    if (document.isModifiedLocally) {
-      return '${document.documentType}\nVersion modifiée';
-    }
-    return document.documentType;
-  }
-}
-
-class _HistoryData {
-  const _HistoryData({this.projects = const [], this.documents = const []});
-
-  final List<AnalysisProject> projects;
-  final List<SavedDocument> documents;
+  String _formatCompanyDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
 
 class AnalysisProjectScreen extends StatefulWidget {
@@ -196,6 +223,12 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
     );
   }
 
+  Future<void> _deleteDocument(SavedDocument document) async {
+    final deleted = await _confirmAndDeleteDocument(context, document);
+    if (!deleted || !mounted) return;
+    setState(() => _documentsFuture = _loadDocuments());
+  }
+
   Future<void> _copy(SavedDocument document) async {
     await Clipboard.setData(ClipboardData(text: document.content));
     if (!mounted) {
@@ -218,6 +251,13 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
         projectTitle: widget.project.name,
         languageCode: languageCode,
         locale: locale,
+      ),
+      projectDetails: ProjectExportDetails(
+        documentType: document.documentType,
+        title: document.title,
+        reference: widget.project.referenceNumber,
+        language: languageCode,
+        source: document.sourceLabel ?? 'local_history',
       ),
       onLayout: (_) => PdfExportService.buildDocumentPdf(
         documentType: document.documentType,
@@ -252,6 +292,13 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
       context: context,
       successMessage: l10n.wordDocumentGenerated,
       errorMessage: l10n.unableToGenerateWordDocument,
+      projectDetails: ProjectExportDetails(
+        documentType: document.documentType,
+        title: document.title,
+        reference: widget.project.referenceNumber,
+        language: languageCode,
+        source: document.sourceLabel ?? 'local_history',
+      ),
     );
   }
 
@@ -268,6 +315,13 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
           content: analysis.content,
         ),
         locale: locale,
+      ),
+      projectDetails: ProjectExportDetails(
+        documentType: AppLocalizations.of(context).actionSummary,
+        title: widget.project.name,
+        reference: widget.project.referenceNumber,
+        language: locale.languageCode,
+        source: 'local_risk_extraction',
       ),
       onLayout: (_) => ActionSummaryPdfService.buildPdf(
         summary: summary,
@@ -357,6 +411,9 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
                     onExport: () => _exportAnalysis(documents.analysis!),
                     onExportWord: () =>
                         _exportAnalysisWord(documents.analysis!),
+                    onOpenFolder: () =>
+                        _openDocumentFolder(context, documents.analysis!),
+                    onDelete: () => _deleteDocument(documents.analysis!),
                   ),
                 if (documents?.summary != null && documents?.analysis != null)
                   _ProjectDocumentCard(
@@ -372,6 +429,9 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
                     ),
                     onCopy: () => _copy(documents.summary!),
                     onExport: () => _exportSummary(documents.analysis!),
+                    onOpenFolder: () =>
+                        _openDocumentFolder(context, documents.summary!),
+                    onDelete: () => _deleteDocument(documents.summary!),
                   ),
                 for (final linkedDocument
                     in documents?.linkedDocuments.whereType<SavedDocument>() ??
@@ -395,6 +455,9 @@ class _AnalysisProjectScreenState extends State<AnalysisProjectScreen> {
                               DocumentFamily.riskAssessment
                           ? () => _exportAnalysisWord(linkedDocument)
                           : null,
+                      onOpenFolder: () =>
+                          _openDocumentFolder(context, linkedDocument),
+                      onDelete: () => _deleteDocument(linkedDocument),
                     ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -426,6 +489,8 @@ class _ProjectDocumentCard extends StatelessWidget {
     required this.onOpen,
     required this.onCopy,
     required this.onExport,
+    required this.onOpenFolder,
+    required this.onDelete,
     this.onExportWord,
   });
 
@@ -434,6 +499,8 @@ class _ProjectDocumentCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onCopy;
   final VoidCallback onExport;
+  final VoidCallback onOpenFolder;
+  final VoidCallback onDelete;
   final VoidCallback? onExportWord;
 
   @override
@@ -454,6 +521,11 @@ class _ProjectDocumentCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 OutlinedButton(onPressed: onOpen, child: Text(l10n.open)),
+                OutlinedButton.icon(
+                  onPressed: onOpenFolder,
+                  icon: const Icon(Icons.folder_open_outlined),
+                  label: const Text('Ouvrir le dossier'),
+                ),
                 OutlinedButton(onPressed: onCopy, child: Text(l10n.copy)),
                 FilledButton.tonal(
                   onPressed: onExport,
@@ -464,6 +536,11 @@ class _ProjectDocumentCard extends StatelessWidget {
                     onPressed: onExportWord,
                     child: Text(l10n.downloadWord),
                   ),
+                TextButton.icon(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Supprimer'),
+                ),
               ],
             ),
           ],
@@ -483,6 +560,87 @@ class _ProjectDocuments {
   final SavedDocument? analysis;
   final SavedDocument? summary;
   final List<SavedDocument?> linkedDocuments;
+}
+
+enum _DocumentDeletionChoice { historyOnly, historyAndFiles }
+
+Future<void> _openDocumentFolder(
+  BuildContext context,
+  SavedDocument document,
+) async {
+  final indexed = await PreventiaProjectService().findIndexedDocument(
+    documentId: document.id,
+    documentType: document.documentType,
+    title: document.title,
+  );
+  if (!context.mounted) return;
+  final filePath = indexed?.wordPath.isNotEmpty == true
+      ? indexed!.wordPath
+      : indexed?.pdfPath ?? '';
+  if (filePath.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Aucun fichier local lié à ce document.')),
+    );
+    return;
+  }
+  final error = await PreventiaDocumentStorageService.openFolder(
+    path.dirname(filePath),
+  );
+  if (error != null && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
+}
+
+Future<bool> _confirmAndDeleteDocument(
+  BuildContext context,
+  SavedDocument document,
+) async {
+  final choice = await showDialog<_DocumentDeletionChoice>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Supprimer ce document ?'),
+      content: const Text(
+        'Voulez-vous supprimer ce document de l’historique ?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Annuler'),
+        ),
+        OutlinedButton(
+          onPressed: () => Navigator.of(
+            dialogContext,
+          ).pop(_DocumentDeletionChoice.historyOnly),
+          child: const Text('Supprimer seulement de l’historique'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(
+            dialogContext,
+          ).pop(_DocumentDeletionChoice.historyAndFiles),
+          child: const Text('Supprimer aussi les fichiers Word/PDF'),
+        ),
+      ],
+    ),
+  );
+  if (choice == null || !context.mounted) return false;
+  final errors = await PreventiaProjectService().removeIndexedDocument(
+    documentId: document.id,
+    documentType: document.documentType,
+    title: document.title,
+    deleteFiles: choice == _DocumentDeletionChoice.historyAndFiles,
+  );
+  await LocalDocumentStorage().deleteDocument(document.id);
+  if (!context.mounted) return true;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        errors.isEmpty
+            ? 'Document supprimé de l’historique.'
+            : 'Document retiré de l’historique. ${errors.join(' ')}',
+      ),
+    ),
+  );
+  return true;
 }
 
 String _exportFileNameForDocument({
@@ -640,6 +798,13 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
       await PdfDeliveryService.exportPdf(
         context: context,
         name: name,
+        projectDetails: ProjectExportDetails(
+          documentType: _document.documentType,
+          title: _document.title,
+          reference: project?.referenceNumber ?? '',
+          language: locale.languageCode,
+          source: _document.sourceLabel ?? 'local_history',
+        ),
         onLayout: (_) => PdfExportService.buildDocumentPdf(
           documentType: _document.documentType,
           content: _document.content,
@@ -679,6 +844,13 @@ class _SavedDocumentDetailScreenState extends State<SavedDocumentDetailScreen> {
         context: context,
         successMessage: l10n.wordDocumentGenerated,
         errorMessage: l10n.unableToGenerateWordDocument,
+        projectDetails: ProjectExportDetails(
+          documentType: _document.documentType,
+          title: _document.title,
+          reference: project?.referenceNumber ?? '',
+          language: locale.languageCode,
+          source: _document.sourceLabel ?? 'local_history',
+        ),
       );
     } catch (_) {
       if (mounted) {

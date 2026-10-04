@@ -25,6 +25,24 @@ class AppLocalizationsDe extends AppLocalizations {
   String get preventionDocuments => 'Präventionsdokumente';
 
   @override
+  String get emergencyDocuments => 'Notfalldokumente';
+
+  @override
+  String get piuTitle => 'Interner Notfallplan — PIU';
+
+  @override
+  String get piuDescription =>
+      'Hilfe zur Erstellung eines operativen Notfallplans mit Kontakten, Verfahren, Evakuierung, Handlungskarten und Freigaben.';
+
+  @override
+  String get piuOperationalHelp =>
+      'Der erzeugte PIU ist eine operative Hilfe. Er muss vervollständigt, vor Ort geprüft, an die tatsächlichen Mittel angepasst und vor der Verteilung freigegeben werden.';
+
+  @override
+  String get piuShortAnswersHelp =>
+      'Antworten Sie kurz. Leere Felder werden als [zu ergänzen] übernommen.';
+
+  @override
   String get generalRiskAnalysis => 'Allgemeine Risikoanalyse';
 
   @override
@@ -85,6 +103,18 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get password => 'Passwort';
+
+  @override
+  String get rememberMe => 'Angemeldet bleiben';
+
+  @override
+  String get showPassword => 'Passwort anzeigen';
+
+  @override
+  String get hidePassword => 'Passwort ausblenden';
+
+  @override
+  String get sessionExpired => 'Sitzung abgelaufen, bitte erneut anmelden';
 
   @override
   String get signIn => 'Anmelden';

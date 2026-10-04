@@ -1,9 +1,40 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as path;
 import 'package:share_plus/share_plus.dart' as share_plus;
 
 import '../models/document_family.dart';
+import 'preventia_document_storage_service.dart';
+
+class ProjectExportDetails {
+  const ProjectExportDetails({
+    required this.documentType,
+    required this.title,
+    required this.reference,
+    required this.language,
+    required this.source,
+    this.companyName = '',
+    this.siteName = '',
+    this.markdown,
+    this.formData,
+    this.projectPath,
+    this.rememberProject = true,
+  });
+
+  final String documentType;
+  final String title;
+  final String reference;
+  final String language;
+  final String source;
+  final String companyName;
+  final String siteName;
+  final String? markdown;
+  final Map<String, dynamic>? formData;
+  final String? projectPath;
+  final bool rememberProject;
+}
 
 class FileExportService {
   const FileExportService._();
@@ -22,17 +53,51 @@ class FileExportService {
     };
   }
 
-  static Future<void> savePdfBytes({
+  static Future<PreventiaSavedDocument?> savePdfBytes({
     required Uint8List bytes,
     required String suggestedFileName,
     required BuildContext context,
+    ProjectExportDetails? projectDetails,
+    bool showResultMessage = true,
   }) async {
     if (!usesSaveDialog) {
-      return;
+      return null;
     }
 
     try {
       final cleanName = cleanPdfFileName(suggestedFileName);
+      String? preventiaError;
+      if (projectDetails != null) {
+        try {
+          final saved = await PreventiaDocumentStorageService()
+              .saveGeneratedDocument(
+                documentType: projectDetails.documentType,
+                companyName: projectDetails.companyName,
+                siteName: projectDetails.siteName,
+                title: projectDetails.title,
+                markdown: projectDetails.markdown,
+                formData: {
+                  ...?projectDetails.formData,
+                  'documentReference': projectDetails.reference,
+                  'language': projectDetails.language,
+                  'source': projectDetails.source,
+                },
+                pdfBytes: bytes,
+                pdfFileName: cleanName,
+                projectPath: projectDetails.projectPath,
+                rememberProject: projectDetails.rememberProject,
+              );
+          if (saved.isIndexed) {
+            if (context.mounted && showResultMessage) {
+              _showSavedMessage(context, saved);
+            }
+            return saved;
+          }
+          preventiaError = saved.error;
+        } on Object catch (error) {
+          debugPrint('PreventIA local PDF export unavailable: $error');
+        }
+      }
       final location = await getSaveLocation(
         acceptedTypeGroups: const [
           XTypeGroup(label: 'PDF', extensions: ['pdf']),
@@ -43,7 +108,7 @@ class FileExportService {
       );
 
       if (location == null) {
-        return;
+        return null;
       }
 
       final file = XFile.fromData(
@@ -51,30 +116,43 @@ class FileExportService {
         mimeType: 'application/pdf',
         name: cleanName,
       );
-      await file.saveTo(_ensurePdfExtension(location.path));
+      final finalPath = _ensurePdfExtension(location.path);
+      await file.saveTo(finalPath);
 
       if (!context.mounted) {
-        return;
+        return null;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Document enregistré.')));
-    } catch (_) {
+      final saved = PreventiaSavedDocument(
+        documentId: '',
+        folderPath: path.dirname(finalPath),
+        pdfPath: finalPath,
+        error:
+            preventiaError ??
+            'Document généré, mais non enregistré dans un dossier PreventIA.',
+      );
+      if (showResultMessage) _showSavedMessage(context, saved);
+      return saved;
+    } catch (error) {
       if (!context.mounted) {
-        return;
+        return null;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d’enregistrer le document.')),
+        SnackBar(
+          content: Text('Impossible d’enregistrer le document : $error'),
+        ),
       );
+      return null;
     }
   }
 
-  static Future<void> saveDocxBytes({
+  static Future<PreventiaSavedDocument?> saveDocxBytes({
     required Uint8List bytes,
     required String suggestedFileName,
     required BuildContext context,
     required String successMessage,
     required String errorMessage,
+    ProjectExportDetails? projectDetails,
+    bool showResultMessage = true,
   }) async {
     if (!usesSaveDialog) {
       try {
@@ -98,24 +176,56 @@ class FileExportService {
           ),
         );
         if (!context.mounted) {
-          return;
+          return null;
         }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(successMessage)));
       } catch (_) {
         if (!context.mounted) {
-          return;
+          return null;
         }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(errorMessage)));
       }
-      return;
+      return null;
     }
 
     try {
       final cleanName = cleanDocxFileName(suggestedFileName);
+      String? preventiaError;
+      if (projectDetails != null) {
+        try {
+          final saved = await PreventiaDocumentStorageService()
+              .saveGeneratedDocument(
+                documentType: projectDetails.documentType,
+                companyName: projectDetails.companyName,
+                siteName: projectDetails.siteName,
+                title: projectDetails.title,
+                markdown: projectDetails.markdown,
+                formData: {
+                  ...?projectDetails.formData,
+                  'documentReference': projectDetails.reference,
+                  'language': projectDetails.language,
+                  'source': projectDetails.source,
+                },
+                wordBytes: bytes,
+                wordFileName: cleanName,
+                projectPath: projectDetails.projectPath,
+                rememberProject: projectDetails.rememberProject,
+              );
+          if (saved.isIndexed) {
+            if (context.mounted && showResultMessage) {
+              _showSavedMessage(context, saved);
+            }
+            return saved;
+          }
+          preventiaError = saved.error;
+        } on Object catch (error) {
+          debugPrint('PreventIA local Word export unavailable: $error');
+        }
+      }
       final location = await getSaveLocation(
         acceptedTypeGroups: const [
           XTypeGroup(
@@ -132,7 +242,7 @@ class FileExportService {
       );
 
       if (location == null) {
-        return;
+        return null;
       }
 
       final file = XFile.fromData(
@@ -141,22 +251,67 @@ class FileExportService {
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         name: cleanName,
       );
-      await file.saveTo(_ensureDocxExtension(location.path));
+      final finalPath = _ensureDocxExtension(location.path);
+      await file.saveTo(finalPath);
 
       if (!context.mounted) {
-        return;
+        return null;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(successMessage)));
-    } catch (_) {
+      final saved = PreventiaSavedDocument(
+        documentId: '',
+        folderPath: path.dirname(finalPath),
+        wordPath: finalPath,
+        error:
+            preventiaError ??
+            'Document généré, mais non enregistré dans un dossier PreventIA.',
+      );
+      if (showResultMessage) _showSavedMessage(context, saved);
+      return saved;
+    } catch (error) {
       if (!context.mounted) {
-        return;
+        return null;
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+      ).showSnackBar(SnackBar(content: Text('$errorMessage : $error')));
+      return null;
     }
+  }
+
+  static void _showSavedMessage(
+    BuildContext context,
+    PreventiaSavedDocument saved,
+  ) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    final details = [
+      if (saved.error != null) saved.error!,
+      if (saved.wordPath != null) 'Word :\n${saved.wordPath}',
+      if (saved.pdfPath != null) 'PDF :\n${saved.pdfPath}',
+      'Dossier :\n${saved.folderPath}',
+    ].join('\n\n');
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Document enregistré'),
+        content: SingleChildScrollView(child: SelectableText(details)),
+        actions: [
+          if (saved.folderPath.isNotEmpty)
+            TextButton(
+              onPressed: () =>
+                  PreventiaDocumentStorageService.openFolder(saved.folderPath),
+              child: const Text('Ouvrir le dossier'),
+            ),
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: details)),
+            child: const Text('Copier le chemin'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 
   static String cleanPdfFileName(String fileName) {

@@ -135,7 +135,7 @@ class DocumentFormData {
   final String presentToCppt;
   final String externalServiceValidation;
   final String occupationalDoctorAdvice;
-  final Map<String, String> extraFields;
+  final Map<String, dynamic> extraFields;
 
   String get workplace => siteConcerned;
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/localized_strings.dart';
 import '../data/document_examples.dart';
+import '../data/risk_assessment_test_presets.dart';
 import '../models/document_form_data.dart';
 import '../models/document_type.dart';
 import '../models/generation_source.dart';
@@ -12,6 +13,7 @@ import '../services/app_config_service.dart';
 import '../services/document_reference_service.dart';
 import '../services/document_generator.dart';
 import '../services/license_service.dart';
+import '../utils/risk_assessment_test_preset_filler.dart';
 import '../widgets/adaptive_page.dart';
 import 'result_screen.dart';
 
@@ -36,6 +38,23 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   late final DocumentType _documentType;
   late final PreventionDocumentConfig? _preventionConfig;
 
+  bool get _isElectricalInstallationsAnalysis =>
+      _documentType.id == 'electrical_installations_risk_analysis';
+
+  bool get _isElevatorRiskAssessment =>
+      _documentType.id == 'elevator_risk_assessment';
+
+  bool get _requiresDedicatedBackendRenderer =>
+      _isElectricalInstallationsAnalysis || _isElevatorRiskAssessment;
+
+  String get _backendDocumentType {
+    if (_isElectricalInstallationsAnalysis) {
+      return electricalInstallationsRiskDocumentType;
+    }
+    if (_isElevatorRiskAssessment) return elevatorRiskDocumentType;
+    return widget.documentType;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +68,8 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
     for (final field in _currentFields) {
       _controllers[field.key] = TextEditingController();
     }
+    _controllers['country']?.text = 'Belgique';
+    _controllers['preventionAdvisor']?.text = 'Vincent Legrand';
     _referenceInitialization = _generateAndSetDocumentReference();
   }
 
@@ -62,6 +83,26 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
   Future<void> _generateDocument() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (_documentType.isRiskAnalysis && !_hasRequiredCompanyProfile()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Veuillez compléter les informations générales obligatoires avant de générer l’analyse.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_documentType.isRiskAnalysis && !_hasRiskProfile()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Veuillez sélectionner le profil de risque de l’entreprise.',
+          ),
+        ),
+      );
       return;
     }
 
@@ -84,6 +125,17 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
     if (!settings.useAiIfAvailable &&
         !settings.disableLocalFallbackForAiTests) {
+      if (_requiresDedicatedBackendRenderer) {
+        setState(() => _isGenerating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Cette analyse doit être générée par le backend PreventIA.',
+            ),
+          ),
+        );
+        return;
+      }
       _openLocalDocument(data, source: GenerationSource.localFallback);
       return;
     }
@@ -92,7 +144,8 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(l10n.noBackendConfigured)));
-      if (settings.disableLocalFallbackForAiTests) {
+      if (settings.disableLocalFallbackForAiTests ||
+          _requiresDedicatedBackendRenderer) {
         setState(() {
           _isGenerating = false;
           _isGeneratingWithAi = false;
@@ -141,7 +194,8 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       if (!mounted) {
         return;
       }
-      if (settings.disableLocalFallbackForAiTests) {
+      if (settings.disableLocalFallbackForAiTests ||
+          _requiresDedicatedBackendRenderer) {
         setState(() {
           _isGenerating = false;
           _isGeneratingWithAi = false;
@@ -182,7 +236,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
     final documentReference = _documentReference;
     return DocumentFormData(
-      documentType: widget.documentType,
+      documentType: _backendDocumentType,
       companyName: value('companyName'),
       siteConcerned: value('siteConcerned'),
       serviceConcerned: value('serviceConcerned'),
@@ -251,15 +305,44 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         if (_preventionConfig != null)
           '_localeName': AppLocalizations.of(context).localeName,
         if (_preventionConfig != null) '_isPreventionDocument': 'true',
+        if (_requiresDedicatedBackendRenderer)
+          'additionalContext': value('additionalInformation'),
         if (documentReference.isNotEmpty) ...{
           'documentReference': documentReference,
           'reference': documentReference,
           if (_documentType.isRiskAnalysis) 'analysisNumber': documentReference,
         },
+        ..._companyProfileValues(),
         for (final field in _currentFields)
           if (!_riskFieldKeys.contains(field.key)) field.key: value(field.key),
       },
     );
+  }
+
+  bool _hasRequiredCompanyProfile() {
+    return _requiredCompanyProfileKeys.every((key) {
+      final value = _profileValue(key);
+      return value.isNotEmpty && !_isIncompletePlaceholder(value);
+    });
+  }
+
+  bool _hasRiskProfile() {
+    final value = _profileValue('riskProfile');
+    return value.isNotEmpty && !_isIncompletePlaceholder(value);
+  }
+
+  Map<String, String> _companyProfileValues() => {
+    for (final key in _companyProfileFieldKeys) key: _profileValue(key),
+  };
+
+  String _profileValue(String key) {
+    final keys = [key, ...(_valueFallbackKeys[key] ?? const <String>[])];
+    for (final candidateKey in keys) {
+      final value = _controllers[candidateKey]?.text.trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    if (key == 'country') return 'Belgique';
+    return '';
   }
 
   Future<void> _ensureDocumentReference() async {
@@ -327,12 +410,59 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
       return;
     }
 
-    _fillExampleValues(
-      example.map((key, value) {
-        return MapEntry(key, value?.toString() ?? '');
-      }),
-    );
+    final values = example.map((key, value) {
+      return MapEntry(key, value?.toString() ?? '');
+    });
+    _fillExampleValues({
+      ...values,
+      if (_documentType.isRiskAnalysis && !values.containsKey('riskProfile'))
+        'riskProfile': 'modéré',
+    });
   }
+
+  Future<void> _fillSpgeTestPreset() async {
+    if (_hasCurrentUserData) {
+      final replace =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              content: const Text(
+                'Remplacer les données actuelles par le scénario test SPGE ?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Remplacer'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!replace || !mounted) {
+        return;
+      }
+    }
+
+    final preset = getRiskAssessmentTestPreset(widget.documentType);
+    setState(() {
+      fillRiskAssessmentControllers(controllers: _controllers, preset: preset);
+    });
+  }
+
+  bool get _hasCurrentUserData => _controllers.entries.any((entry) {
+    if (_isReferenceField(entry.key)) {
+      return false;
+    }
+    final value = entry.value.text.trim();
+    if (value.isEmpty) {
+      return false;
+    }
+    return !_isDefaultCompanyProfileValue(entry.key, value);
+  });
 
   void _clearForm() {
     final preservedReference = _documentReference;
@@ -388,9 +518,12 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ResultScreen(
-          documentType: widget.documentType,
+          documentType: _backendDocumentType,
           content: _contentWithDocumentReference(content),
           documentReference: _documentReference,
+          companyName: _controllers['companyName']?.text.trim(),
+          siteName: _controllers['siteConcerned']?.text.trim(),
+          formData: _buildFormData().toJson(),
           generationSource: generationSource,
           linkedDocuments: linkedDocuments,
         ),
@@ -416,11 +549,35 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                 l10n.completeFormIntro,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (_isElectricalInstallationsAnalysis) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Cette analyse est une aide au conseiller en prévention. '
+                  'Elle doit être vérifiée, complétée sur site et confrontée '
+                  'aux rapports RGIE, contrôles périodiques et constats réels.',
+                ),
+              ],
+              if (_isElevatorRiskAssessment) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Cette analyse est une aide au conseiller en prévention. '
+                  'Elle doit être vérifiée, complétée sur site et confrontée '
+                  'aux rapports SECT, contrôles périodiques, documents de '
+                  'maintenance et constats réels.',
+                ),
+              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
                 runSpacing: 8,
                 children: [
+                  if (_documentType.isRiskAnalysis)
+                    OutlinedButton.icon(
+                      key: const ValueKey('fill-spge-test-preset'),
+                      onPressed: _isGenerating ? null : _fillSpgeTestPreset,
+                      icon: const Icon(Icons.science_outlined),
+                      label: const Text('Remplir avec scénario test SPGE'),
+                    ),
                   OutlinedButton.icon(
                     onPressed: _isGenerating ? null : _fillCompleteExample,
                     icon: const Icon(Icons.auto_fix_high_outlined),
@@ -593,10 +750,53 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   Widget _buildField(_FormFieldDefinition field) {
     final help = _fieldHelp[field.key];
     final l10n = AppLocalizations.of(context);
+    final localizedRiskLabel = l10n.fieldLabel(field.key);
     final label = _preventionConfig == null
-        ? l10n.fieldLabel(field.key)
+        ? (_companyProfileFieldKeys.contains(field.key)
+              ? field.label
+              : (localizedRiskLabel == field.key
+                    ? field.label
+                    : localizedRiskLabel))
         : localizedPreventionFieldLabel(field.key, l10n.localeName);
     final hasHelp = _preventionConfig != null || help != null;
+
+    if (field.key == 'riskProfile') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue:
+              _riskProfileValues.contains(_controllers[field.key]?.text)
+              ? _controllers[field.key]?.text
+              : null,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            filled: true,
+            labelText: label,
+            suffixIcon: !hasHelp
+                ? null
+                : IconButton(
+                    tooltip: l10n.help,
+                    icon: const Icon(Icons.info_outline, size: 20),
+                    onPressed: () => _showFieldHelp(label, help, field.key),
+                  ),
+          ),
+          items: _riskProfileValues
+              .map(
+                (value) => DropdownMenuItem(
+                  value: value,
+                  child: Text(value, overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(growable: false),
+          onChanged: _isGenerating
+              ? null
+              : (value) {
+                  _controllers[field.key]?.text = value ?? '';
+                },
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -686,7 +886,30 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   List<_FormSection> get _currentSections {
     final config = _preventionConfig;
     if (config == null) {
-      return _sections;
+      final sectionsWithoutProfileDuplicates = _sections
+          .map(
+            (section) => _FormSection(
+              title: section.title,
+              initiallyExpanded: section.initiallyExpanded,
+              fields: section.fields
+                  .where(
+                    (field) => !_companyProfileFieldKeys.contains(field.key),
+                  )
+                  .toList(),
+            ),
+          )
+          .where((section) => section.fields.isNotEmpty)
+          .toList();
+      final sections = _documentType.isRiskAnalysis
+          ? [_companyProfileSection, ...sectionsWithoutProfileDuplicates]
+          : _sections;
+      if (_isElectricalInstallationsAnalysis) {
+        return [...sections, _electricalInstallationsSection];
+      }
+      if (_isElevatorRiskAssessment) {
+        return [...sections, _elevatorRiskAssessmentSection];
+      }
+      return sections;
     }
     return config.sections
         .map(
@@ -739,10 +962,64 @@ bool _isReferenceField(String key) {
   }.contains(key);
 }
 
+bool _isDefaultCompanyProfileValue(String key, String value) {
+  return (key == 'country' && value == 'Belgique') ||
+      (key == 'preventionAdvisor' && value == 'Vincent Legrand');
+}
+
 const _valueFallbackKeys = {
   'author': ['preparedBy'],
   'visitDate': ['visitDateTime', 'eventDateTime', 'date'],
+  'siteName': ['siteConcerned', 'buildingName'],
+  'siteConcerned': ['siteName', 'buildingName'],
+  'activityDescription': ['activity', 'activityType'],
+  'numberOfWorkers': ['workerCount'],
+  'visitorsPresence': ['visitors'],
+  'externalCompaniesPresence': ['externalCompanies'],
 };
+
+const _requiredCompanyProfileKeys = {
+  'companyName',
+  'siteName',
+  'address',
+  'postalCode',
+  'city',
+  'siteContact',
+  'preventionAdvisor',
+  'activityDescription',
+};
+
+const _companyProfileFieldKeys = {
+  'companyName',
+  'siteName',
+  'address',
+  'postalCode',
+  'city',
+  'country',
+  'siteContact',
+  'preventionAdvisor',
+  'siteManager',
+  'technicalServiceContact',
+  'generalPhone',
+  'generalEmail',
+  'activityDescription',
+  'riskProfile',
+  'numberOfWorkers',
+  'visitorsPresence',
+  'externalCompaniesPresence',
+  'workingHours',
+};
+
+bool _isIncompletePlaceholder(String value) {
+  final normalized = value
+      .toLowerCase()
+      .replaceAll(RegExp('[àáâä]'), 'a')
+      .replaceAll(RegExp('[éèêë]'), 'e')
+      .trim();
+  return normalized == '[a completer]' ||
+      normalized == 'a completer' ||
+      normalized == 'non renseigne / a verifier';
+}
 
 class _FormSection {
   const _FormSection({
@@ -770,6 +1047,45 @@ class _FieldHelp {
   final String description;
   final String example;
 }
+
+const _companyProfileSection = _FormSection(
+  title: 'Informations générales obligatoires',
+  initiallyExpanded: true,
+  fields: [
+    _FormFieldDefinition('companyName', 'Nom de la société / entreprise'),
+    _FormFieldDefinition('siteName', 'Site / bâtiment concerné'),
+    _FormFieldDefinition('address', 'Adresse complète du site', maxLines: 2),
+    _FormFieldDefinition('postalCode', 'Code postal'),
+    _FormFieldDefinition('city', 'Ville'),
+    _FormFieldDefinition('country', 'Pays'),
+    _FormFieldDefinition('siteContact', 'Personne de contact sur site'),
+    _FormFieldDefinition('preventionAdvisor', 'Conseiller en prévention'),
+    _FormFieldDefinition('siteManager', 'Responsable du site / bâtiment'),
+    _FormFieldDefinition(
+      'technicalServiceContact',
+      'Service technique / maintenance',
+    ),
+    _FormFieldDefinition('generalPhone', 'Téléphone général du site'),
+    _FormFieldDefinition('generalEmail', 'E-mail général du site'),
+    _FormFieldDefinition(
+      'activityDescription',
+      'Activité du site',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition('riskProfile', 'Profil de risque de l’entreprise'),
+    _FormFieldDefinition(
+      'numberOfWorkers',
+      'Nombre approximatif de travailleurs',
+    ),
+    _FormFieldDefinition('visitorsPresence', 'Présence de visiteurs'),
+    _FormFieldDefinition(
+      'externalCompaniesPresence',
+      'Entreprises extérieures présentes',
+      maxLines: 2,
+    ),
+    _FormFieldDefinition('workingHours', 'Horaires d’occupation'),
+  ],
+);
 
 const _fieldHelp = <String, _FieldHelp>{
   'companyName': _FieldHelp(
@@ -1043,6 +1359,16 @@ const _fieldHelp = <String, _FieldHelp>{
   ),
 };
 
+const _riskProfileValues = [
+  'faible',
+  'modéré',
+  'élevé',
+  'très élevé',
+  'Seveso seuil bas',
+  'Seveso seuil haut',
+  'inconnu / à déterminer',
+];
+
 const _sections = [
   _FormSection(
     title: 'A. Identification du document',
@@ -1305,6 +1631,139 @@ const _sections = [
 
 final _allFields = _sections.expand((section) => section.fields).toList();
 final _riskFieldKeys = _allFields.map((field) => field.key).toSet();
+
+const _electricalInstallationsSection = _FormSection(
+  title: 'I. Installations électriques BT/HT',
+  fields: [
+    _FormFieldDefinition('address', 'Adresse de l’installation', maxLines: 2),
+    _FormFieldDefinition(
+      'activityDescription',
+      'Description de l’activité et des interventions électriques',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition(
+      'installationType',
+      'Type d’installation : basse tension / haute tension / mixte',
+    ),
+    _FormFieldDefinition(
+      'installationStatus',
+      'Installation : nouvelle / existante / modification',
+    ),
+    _FormFieldDefinition(
+      'lifecycleStage',
+      'Stade : conception / réalisation / réception / exploitation / modification',
+      maxLines: 2,
+    ),
+    _FormFieldDefinition('lowVoltageCabinetPresent', 'Présence armoire BT'),
+    _FormFieldDefinition('highVoltageCabinPresent', 'Présence cabine HT'),
+    _FormFieldDefinition('transformerPresent', 'Présence transformateur'),
+    _FormFieldDefinition('mainLowVoltageSwitchboardPresent', 'Présence TGBT'),
+    _FormFieldDefinition('rgieReportAvailable', 'PV RGIE disponible'),
+    _FormFieldDefinition(
+      'lastPeriodicInspectionAvailable',
+      'Dernier contrôle périodique disponible',
+    ),
+    _FormFieldDefinition('ba4Ba5ListAvailable', 'Liste BA4/BA5 disponible'),
+    _FormFieldDefinition(
+      'lockoutProcedureAvailable',
+      'Procédure de consignation disponible',
+    ),
+    _FormFieldDefinition(
+      'thermographyReportAvailable',
+      'Rapport thermographie disponible',
+    ),
+    _FormFieldDefinition(
+      'approvedBodyOpenRemarks',
+      'Remarques ouvertes de l’organisme agréé',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition(
+      'connectedWorkEquipment',
+      'Équipements de travail raccordés',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition(
+      'additionalContext',
+      'Commentaires / points d’attention',
+      maxLines: 4,
+    ),
+  ],
+);
+
+const _elevatorRiskAssessmentSection = _FormSection(
+  title: 'I. Ascenseur',
+  fields: [
+    _FormFieldDefinition('owner', 'Propriétaire'),
+    _FormFieldDefinition('manager', 'Gestionnaire'),
+    _FormFieldDefinition('contactPerson', 'Personne de contact'),
+    _FormFieldDefinition('preventionAdvisor', 'Conseiller en prévention'),
+    _FormFieldDefinition('sect', 'SECT connu'),
+    _FormFieldDefinition('maintenanceCompany', 'Entreprise de maintenance'),
+    _FormFieldDefinition(
+      'elevatorAddress',
+      'Adresse de l’ascenseur',
+      maxLines: 2,
+    ),
+    _FormFieldDefinition('elevatorLocation', 'Localisation dans le bâtiment'),
+    _FormFieldDefinition('brand', 'Marque'),
+    _FormFieldDefinition('serialNumber', 'Numéro de fabrication'),
+    _FormFieldDefinition('constructionYear', 'Année de construction'),
+    _FormFieldDefinition('commissioningDate', 'Date de mise en service'),
+    _FormFieldDefinition(
+      'elevatorType',
+      'Type d’ascenseur : électrique / hydraulique / vis sans fin / autre',
+    ),
+    _FormFieldDefinition('ratedLoad', 'Charge nominale'),
+    _FormFieldDefinition('personCapacity', 'Nombre de personnes'),
+    _FormFieldDefinition('speed', 'Vitesse'),
+    _FormFieldDefinition('numberOfStops', 'Nombre d’arrêts'),
+    _FormFieldDefinition(
+      'environment',
+      'Environnement : bureaux / habitation / hôpital / maison de repos / industriel / commerce / autre',
+      maxLines: 2,
+    ),
+    _FormFieldDefinition('usageIntensity', 'Utilisation normale ou intensive'),
+    _FormFieldDefinition(
+      'vulnerableUsers',
+      'Utilisateurs vulnérables : enfants / personnes âgées / PMR / autres handicaps',
+      maxLines: 2,
+    ),
+    _FormFieldDefinition(
+      'historicalValue',
+      'Valeur historique : oui / non / inconnue',
+    ),
+    _FormFieldDefinition('sectReportAvailable', 'Rapport SECT disponible'),
+    _FormFieldDefinition(
+      'lastPeriodicInspectionDate',
+      'Dernier contrôle périodique disponible',
+    ),
+    _FormFieldDefinition(
+      'regularizationCertificateAvailable',
+      'Attestation de régularisation disponible',
+    ),
+    _FormFieldDefinition(
+      'openSectRemarks',
+      'Remarques ouvertes SECT',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition(
+      'modernizationWorkCompleted',
+      'Travaux de modernisation réalisés',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition('openWork', 'Travaux ouverts', maxLines: 3),
+    _FormFieldDefinition(
+      'activityDescription',
+      'Description de l’utilisation de l’ascenseur',
+      maxLines: 3,
+    ),
+    _FormFieldDefinition(
+      'additionalContext',
+      'Commentaires / points d’attention',
+      maxLines: 4,
+    ),
+  ],
+);
 
 Map<String, String> getCompleteExampleData(String localeName) {
   return switch (localeName) {

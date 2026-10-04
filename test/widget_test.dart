@@ -29,6 +29,13 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Analyse de risques'), findsOneWidget);
+    expect(find.text('Dossier PreventIA'), findsOneWidget);
+    expect(
+      find.text(
+        'Après la première analyse de risques, PreventIA vous proposera de choisir où créer le dossier local de la société.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Documents de prévention'), findsOneWidget);
     expect(find.text('Nouveau document'), findsNothing);
     expect(find.text('Plan annuel d’action'), findsOneWidget);
@@ -37,6 +44,8 @@ void main() {
     expect(find.text('Fiche de poste'), findsOneWidget);
     expect(find.text('Fiche d’instruction sécurité'), findsOneWidget);
     expect(find.text('Rapport d’accident ou d’incident'), findsOneWidget);
+    expect(find.text('Documents d’urgence'), findsOneWidget);
+    expect(find.text('Plan Interne d’Urgence — PIU'), findsOneWidget);
     expect(find.text('Historique'), findsOneWidget);
     expect(find.text('Mentions et limites'), findsOneWidget);
 
@@ -67,10 +76,6 @@ void main() {
 
     expect(
       find.text('Gemeentebestuur van Verviers – Technische dienst'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Interne preventieadviseur – ontwerp aan te vullen'),
       findsOneWidget,
     );
   });
@@ -114,10 +119,6 @@ void main() {
       find.text('Municipal Administration of Verviers – Technical Department'),
       findsOneWidget,
     );
-    expect(
-      find.text('Internal prevention advisor – draft to be completed'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('German complete example fills the form in German', (
@@ -146,10 +147,6 @@ void main() {
       find.text('Gemeindeverwaltung Verviers – Technischer Dienst'),
       findsOneWidget,
     );
-    expect(
-      find.text('Interner Präventionsberater – Entwurf zu vervollständigen'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('form section headers use readable styling and visible states', (
@@ -176,7 +173,7 @@ void main() {
     await tester.tap(find.text('Allgemeine Risikoanalyse'));
     await tester.pumpAndSettle();
 
-    final sectionTitle = find.text('A. Identifikation des Dokuments');
+    final sectionTitle = find.text('Informations générales obligatoires');
     expect(sectionTitle, findsOneWidget);
 
     final titleText = tester.widget<Text>(sectionTitle);

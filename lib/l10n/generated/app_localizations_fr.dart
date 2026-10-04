@@ -24,6 +24,24 @@ class AppLocalizationsFr extends AppLocalizations {
   String get preventionDocuments => 'Documents de prévention';
 
   @override
+  String get emergencyDocuments => 'Documents d’urgence';
+
+  @override
+  String get piuTitle => 'Plan Interne d’Urgence — PIU';
+
+  @override
+  String get piuDescription =>
+      'Générer un plan opérationnel d’urgence interne.';
+
+  @override
+  String get piuOperationalHelp =>
+      'Le PIU généré est une aide opérationnelle. Il doit être complété, vérifié sur site, adapté aux moyens réels et validé avant diffusion.';
+
+  @override
+  String get piuShortAnswersHelp =>
+      'Privilégiez des réponses courtes. Les champs vides seront repris comme [à compléter].';
+
+  @override
   String get generalRiskAnalysis => 'Analyse de risques générale';
 
   @override
@@ -84,6 +102,18 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get password => 'Mot de passe';
+
+  @override
+  String get rememberMe => 'Se souvenir de moi';
+
+  @override
+  String get showPassword => 'Afficher le mot de passe';
+
+  @override
+  String get hidePassword => 'Masquer le mot de passe';
+
+  @override
+  String get sessionExpired => 'Session expirée, veuillez vous reconnecter';
 
   @override
   String get signIn => 'Se connecter';

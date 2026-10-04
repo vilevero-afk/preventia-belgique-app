@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -5,15 +7,20 @@ import '../l10n/generated/app_localizations.dart';
 import '../l10n/pdf_texts.dart';
 import '../models/document_family.dart';
 import '../models/generation_source.dart';
+import '../models/preventia_company_project.dart';
+import '../models/preventia_project.dart' show normalizeCompanyName;
 import '../services/analysis_project_service.dart';
 import '../services/ai_document_service.dart';
 import '../services/docx_export_service.dart';
 import '../services/file_export_service.dart';
 import '../services/pdf_export_service.dart';
 import '../services/pdf_delivery_service.dart';
+import '../services/preventia_document_storage_service.dart';
+import '../services/preventia_company_project_service.dart';
 import '../widgets/adaptive_page.dart';
 import '../widgets/simple_markdown_document_view.dart';
 import 'action_summary_screen.dart';
+import 'company_folder_detail_screen.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
@@ -21,6 +28,9 @@ class ResultScreen extends StatefulWidget {
     required this.content,
     required this.generationSource,
     this.documentReference,
+    this.companyName,
+    this.siteName,
+    this.formData = const {},
     this.linkedDocuments = const [],
     super.key,
   });
@@ -28,6 +38,9 @@ class ResultScreen extends StatefulWidget {
   final String documentType;
   final String content;
   final String? documentReference;
+  final String? companyName;
+  final String? siteName;
+  final Map<String, dynamic> formData;
   final GenerationSource generationSource;
   final List<AiLinkedDocument> linkedDocuments;
 
@@ -39,6 +52,231 @@ class _ResultScreenState extends State<ResultScreen> {
   bool _isSaving = false;
   bool _isExportingPdf = false;
   bool _isExportingWord = false;
+  late final Future<void> _projectPreparation;
+  PreventiaCompanyProject? _selectedProject;
+  PreventiaCompanyUpdateResult? _companyUpdate;
+
+  @override
+  void initState() {
+    super.initState();
+    final completer = Completer<void>();
+    _projectPreparation = completer.future;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await _preparePreventiaProject();
+      } finally {
+        completer.complete();
+      }
+    });
+  }
+
+  Future<void> _preparePreventiaProject() async {
+    try {
+      final isRiskAssessment =
+          resolveDocumentFamily(widget.documentType) ==
+          DocumentFamily.riskAssessment;
+      if (!isRiskAssessment) return;
+      final service = PreventiaCompanyProjectService();
+      final data = <String, dynamic>{
+        ...widget.formData,
+        if (widget.companyName?.trim().isNotEmpty == true)
+          'companyName': widget.companyName,
+        if (widget.siteName?.trim().isNotEmpty == true)
+          'siteName': widget.siteName,
+      };
+      final companyKey = normalizeCompanyName(
+        detectCompanyName(data, widget.content),
+      );
+      final before = await service.findByKey(companyKey);
+      final project = await service.addRiskAssessmentToCompanyProject(
+        documentType: widget.documentType,
+        markdown: widget.content,
+        formData: data,
+        reference: widget.documentReference?.trim() ?? '',
+      );
+      final analysis = project.analyses.last;
+      final update = PreventiaCompanyUpdateResult(
+        project: project,
+        actionCount: project.actionItems
+            .where((item) => item.sourceDocumentId == analysis.id)
+            .length,
+        piuCount: project.piuItems
+            .where((item) => item.sourceDocumentId == analysis.id)
+            .length,
+        diuCount: project.diuItems
+            .where((item) => item.sourceDocumentId == analysis.id)
+            .length,
+        evidenceCount: project.evidenceItems
+            .where((item) => item.sourceDocumentId == analysis.id)
+            .length,
+        piuCreated: before?.piuDocument == null,
+        pgaCreated: before?.pgaDocument == null,
+      );
+      _companyUpdate = update;
+      _selectedProject = update.project;
+      if (mounted) await _showCompanySummary(update);
+    } on Object catch (error) {
+      debugPrint('PreventIA company history update unavailable: $error');
+    }
+  }
+
+  Future<void> _showCompanySummary(PreventiaCompanyUpdateResult update) async {
+    if (!mounted) return;
+    final company = update.project.companyName;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Analyse ajoutée au dossier société'),
+        content: Text(
+          'Société : $company\n\n'
+          'Ajouté au dossier :\nDossier PreventIA — $company\n\n'
+          'Éléments mis à jour :\n'
+          '- Analyse de risques ajoutée\n'
+          '- PIU ${update.piuCreated ? 'créé' : 'déjà existant'}\n'
+          '- PGA/PAA/PGP ${update.pgaCreated ? 'créé' : 'déjà existant'}\n'
+          '- ${update.actionCount} actions candidates\n'
+          '- ${update.piuCount} points candidats PIU\n'
+          '- ${update.diuCount} points candidats DIU\n'
+          '- ${update.evidenceCount} preuves/photos à obtenir',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => CompanyFolderDetailScreen(
+                    companyKey: update.project.companyKey,
+                  ),
+                ),
+              );
+            },
+            child: Text('Voir le dossier $company'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showStorageSummary(
+    PreventiaSavedDocument saved, {
+    required bool includeExportPaths,
+  }) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    final extraction = saved;
+    final pathDetails = [
+      if (saved.wordPath != null) 'Word :\n${saved.wordPath}',
+      if (saved.pdfPath != null) 'PDF :\n${saved.pdfPath}',
+      if (saved.folderPath.isNotEmpty) 'Dossier :\n${saved.folderPath}',
+    ].join('\n\n');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          saved.isIndexed
+              ? 'Analyse ajoutée au dossier société'
+              : 'Document généré',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (saved.error != null) ...[
+                Text(saved.error!),
+                const SizedBox(height: 12),
+              ],
+              if (saved.folderPath.isNotEmpty)
+                SelectableText(
+                  'Société : ${widget.companyName ?? _selectedProject?.companyName ?? ''}\n'
+                  'Dossier :\n${saved.folderPath}',
+                ),
+              if (includeExportPaths) ...[
+                const SizedBox(height: 12),
+                if (saved.wordPath != null)
+                  SelectableText('Word : ${saved.wordPath}'),
+                if (saved.pdfPath != null)
+                  SelectableText('PDF : ${saved.pdfPath}'),
+              ],
+              if (saved.isIndexed &&
+                  resolveDocumentFamily(widget.documentType) ==
+                      DocumentFamily.riskAssessment) ...[
+                const SizedBox(height: 16),
+                const Text('Éléments ajoutés au dossier PreventIA :'),
+                const SizedBox(height: 8),
+                const Text('Documents :'),
+                const Text('- Analyse enregistrée'),
+                Text(
+                  extraction.piuCreated
+                      ? '- PIU vierge créé'
+                      : '- PIU existant conservé',
+                ),
+                Text(
+                  extraction.pgaCreated
+                      ? '- PGA/PAA/PGP créé'
+                      : '- PGA existant conservé',
+                ),
+                const SizedBox(height: 8),
+                const Text('Éléments extraits :'),
+                Text('- ${extraction.actionCount} actions pour PGA/PAA/PGP'),
+                Text('- ${extraction.piuCount} points candidats PIU'),
+                Text('- ${extraction.diuCount} points candidats DIU'),
+                Text('- ${extraction.evidenceCount} preuves/photos à obtenir'),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          if (saved.folderPath.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                final error = await PreventiaDocumentStorageService.openFolder(
+                  saved.folderPath,
+                );
+                if (error != null && mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(error)));
+                }
+              },
+              child: const Text('Ouvrir le dossier'),
+            ),
+          if (saved.isIndexed && _selectedProject != null)
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).clearSnackBars();
+                Navigator.of(dialogContext).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => CompanyFolderDetailScreen(
+                      companyKey: _selectedProject!.companyKey,
+                    ),
+                  ),
+                );
+              },
+              child: Text(
+                'Voir le dossier ${_selectedProject?.companyName ?? ''}',
+              ),
+            ),
+          if (pathDetails.isNotEmpty)
+            TextButton(
+              onPressed: () =>
+                  Clipboard.setData(ClipboardData(text: pathDetails)),
+              child: const Text('Copier le chemin'),
+            ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _copyDocument() async {
     await Clipboard.setData(ClipboardData(text: widget.content));
@@ -59,20 +297,7 @@ class _ResultScreenState extends State<ResultScreen> {
         resolveDocumentFamily(widget.documentType) ==
         DocumentFamily.riskAssessment;
     if (supportsAutomaticSummary) {
-      await AnalysisProjectService().saveAnalysisWithSummary(
-        analysisTitle: widget.documentType,
-        analysisContent: widget.content,
-        referenceNumber: widget.documentReference,
-        projectStatus: l10n.projectToValidate,
-        actionSummaryTitle: l10n.actionSummary,
-        linkedAnalysisLabel: l10n.completeAnalysis,
-        generatedAtLabel: l10n.generatedAt,
-        sourceFieldLabel: l10n.source,
-        sourceValue: _pdfSourceText(l10n),
-        statusLabel: l10n.status('').replaceAll(':', '').trim(),
-        validationNoticeTitle: l10n.validationNoticeTitle,
-        validationNotice: l10n.localValidationNotice,
-      );
+      await _projectPreparation;
     } else {
       await AnalysisProjectService().saveDocumentPackage(
         documentTitle: widget.documentType,
@@ -95,14 +320,14 @@ class _ResultScreenState extends State<ResultScreen> {
       return;
     }
     setState(() => _isSaving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).savedAnalysisFolderMessage),
-      ),
-    );
+    if (supportsAutomaticSummary && _companyUpdate != null) {
+      await _showCompanySummary(_companyUpdate!);
+    }
   }
 
   Future<void> _exportPdf() async {
+    await _projectPreparation;
+    if (!mounted) return;
     setState(() => _isExportingPdf = true);
     final generatedAt = DateTime.now();
     final l10n = AppLocalizations.of(context);
@@ -113,7 +338,7 @@ class _ResultScreenState extends State<ResultScreen> {
     );
 
     try {
-      await PdfDeliveryService.exportPdf(
+      final saved = await PdfDeliveryService.exportPdf(
         context: context,
         name: FileExportService.documentFileName(
           projectTitle: exportProjectTitle,
@@ -121,6 +346,11 @@ class _ResultScreenState extends State<ResultScreen> {
           languageCode: l10n.localeName,
           referenceNumber: exportReference,
         ),
+        projectDetails: _projectExportDetails(
+          reference: exportReference,
+          language: l10n.localeName,
+        ),
+        showResultMessage: false,
         onLayout: (_) => PdfExportService.buildDocumentPdf(
           documentType: widget.documentType,
           content: widget.content,
@@ -132,6 +362,9 @@ class _ResultScreenState extends State<ResultScreen> {
           ),
         ),
       );
+      if (saved != null && mounted) {
+        await _showStorageSummary(saved, includeExportPaths: true);
+      }
     } finally {
       if (mounted) {
         setState(() => _isExportingPdf = false);
@@ -140,6 +373,8 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   Future<void> _exportWord() async {
+    await _projectPreparation;
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context);
     final exportReference = PdfExportService.resolveDocumentReference(
       metadataDocumentReference: widget.documentReference,
@@ -154,7 +389,7 @@ class _ResultScreenState extends State<ResultScreen> {
         generatedAt: generatedAt,
         referenceNumber: widget.documentReference,
       );
-      await FileExportService.saveDocxBytes(
+      final saved = await FileExportService.saveDocxBytes(
         bytes: bytes,
         suggestedFileName: FileExportService.documentWordFileName(
           projectTitle: _exportProjectTitleFromContent(),
@@ -165,7 +400,15 @@ class _ResultScreenState extends State<ResultScreen> {
         context: context,
         successMessage: l10n.wordDocumentGenerated,
         errorMessage: l10n.unableToGenerateWordDocument,
+        projectDetails: _projectExportDetails(
+          reference: exportReference,
+          language: l10n.localeName,
+        ),
+        showResultMessage: false,
       );
+      if (saved != null && mounted) {
+        await _showStorageSummary(saved, includeExportPaths: true);
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -329,5 +572,24 @@ class _ResultScreenState extends State<ResultScreen> {
 
   String? _exportProjectTitleFromContent() {
     return FileExportService.projectTitleFromContent(widget.content);
+  }
+
+  ProjectExportDetails _projectExportDetails({
+    required String? reference,
+    required String language,
+  }) {
+    return ProjectExportDetails(
+      documentType: widget.documentType,
+      title: _exportProjectTitleFromContent() ?? widget.documentType,
+      reference: reference ?? '',
+      language: language,
+      source: widget.generationSource.value,
+      companyName: widget.companyName ?? '',
+      siteName: widget.siteName ?? '',
+      markdown: widget.content,
+      formData: widget.formData,
+      projectPath: _selectedProject?.localFolderPath,
+      rememberProject: true,
+    );
   }
 }

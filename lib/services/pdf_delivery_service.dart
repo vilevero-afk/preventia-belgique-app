@@ -7,40 +7,46 @@ import 'package:printing/printing.dart';
 
 import '../utils/platform_capabilities.dart';
 import 'file_export_service.dart';
+import 'preventia_document_storage_service.dart';
 
 class PdfDeliveryService {
   const PdfDeliveryService._();
 
-  static Future<void> exportPdf({
+  static Future<PreventiaSavedDocument?> exportPdf({
     required BuildContext context,
     required String name,
     required FutureOr<Uint8List> Function(PdfPageFormat format) onLayout,
+    ProjectExportDetails? projectDetails,
+    bool showResultMessage = true,
   }) async {
     try {
       if (FileExportService.usesSaveDialog) {
         final bytes = await onLayout(PdfPageFormat.a4);
         if (!context.mounted) {
-          return;
+          return null;
         }
-        await FileExportService.savePdfBytes(
+        return FileExportService.savePdfBytes(
           bytes: bytes,
           suggestedFileName: name,
           context: context,
+          projectDetails: projectDetails,
+          showResultMessage: showResultMessage,
         );
-        return;
       }
 
       await Printing.layoutPdf(
         name: FileExportService.cleanPdfFileName(name),
         onLayout: onLayout,
       );
+      return null;
     } catch (_) {
       if (!context.mounted) {
-        return;
+        return null;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(PlatformCapabilities.pdfUnavailableMessage)),
       );
+      return null;
     }
   }
 }

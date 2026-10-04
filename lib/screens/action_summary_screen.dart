@@ -145,6 +145,15 @@ class _ActionSummaryScreenState extends State<ActionSummaryScreen> {
           languageCode: widget.exportLanguageCode,
           locale: projectTitle == null ? null : Localizations.localeOf(context),
         ),
+        projectDetails: ProjectExportDetails(
+          documentType: AppLocalizations.of(context).actionSummary,
+          title: projectTitle ?? widget.sourceAnalysisTitle,
+          reference: widget.exportReferenceNumber ?? '',
+          language:
+              widget.exportLanguageCode ??
+              Localizations.localeOf(context).languageCode,
+          source: 'local_risk_extraction',
+        ),
         onLayout: (_) => ActionSummaryPdfService.buildPdf(
           summary: _summary,
           sourceAnalysisTitle: widget.sourceAnalysisTitle,

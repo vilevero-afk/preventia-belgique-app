@@ -40,6 +40,49 @@ class LocalDocumentStorage {
     );
   }
 
+  Future<void> deleteDocument(String documentId) async {
+    final preferences = await SharedPreferences.getInstance();
+    final documents = (preferences.getStringList(_documentsKey) ?? [])
+        .map(SavedDocument.decode)
+        .where((document) => document.id != documentId)
+        .toList();
+    await preferences.setStringList(
+      _documentsKey,
+      documents.map((document) => document.encode()).toList(),
+    );
+
+    final projects = (preferences.getStringList(_projectsKey) ?? [])
+        .map(AnalysisProject.decode)
+        .toList();
+    final updatedProjects = <AnalysisProject>[];
+    for (final project in projects) {
+      if (project.analysisDocumentId == documentId) continue;
+      updatedProjects.add(
+        AnalysisProject(
+          id: project.id,
+          name: project.name,
+          createdAt: project.createdAt,
+          modifiedAt: DateTime.now(),
+          referenceNumber: project.referenceNumber,
+          analysisTitle: project.analysisTitle,
+          analysisDocumentId: project.analysisDocumentId,
+          actionSummaryDocumentId: project.actionSummaryDocumentId == documentId
+              ? null
+              : project.actionSummaryDocumentId,
+          linkedDocumentIds: project.linkedDocumentIds
+              .where((id) => id != documentId)
+              .toList(),
+          folderType: project.folderType,
+          status: project.status,
+        ),
+      );
+    }
+    await preferences.setStringList(
+      _projectsKey,
+      updatedProjects.map((project) => project.encode()).toList(),
+    );
+  }
+
   Future<List<AnalysisProject>> loadProjects() async {
     final preferences = await SharedPreferences.getInstance();
     final encodedProjects = preferences.getStringList(_projectsKey) ?? [];

@@ -255,7 +255,7 @@ void main() {
         }),
       );
 
-      final status = await service.login(' user@example.com ', 'secret');
+      final status = await service.login(' user@example.com ', 'secret', true);
 
       expect(
         requestedUri,
@@ -271,6 +271,7 @@ void main() {
       expect(await storage.read(key: 'authToken'), 'token-test');
       expect(await storage.read(key: 'email'), 'user@example.com');
       expect(await storage.read(key: 'cachedLicenseStatus'), isNotNull);
+      expect(await storage.read(key: 'rememberMe'), 'true');
     });
 
     test('login parses token and licenseStatus response shape', () async {
@@ -302,7 +303,7 @@ void main() {
         }),
       );
 
-      final status = await service.login('user@example.com', 'secret');
+      final status = await service.login('user@example.com', 'secret', true);
 
       expect(status.isActive, isTrue);
       expect(status.email, 'user@example.com');
@@ -326,12 +327,12 @@ void main() {
       );
 
       expect(
-        () => service.login('user@example.com', 'secret'),
+        () => service.login('user@example.com', 'secret', false),
         throwsA(
           isA<LicenseException>().having(
             (error) => error.message,
             'message',
-            'Identifiants invalides',
+            'Email ou mot de passe incorrect.',
           ),
         ),
       );
@@ -343,6 +344,7 @@ void main() {
       String? authorization;
       final storage = _MemoryLicenseStorage();
       await storage.write(key: 'authToken', value: 'token-test');
+      await storage.write(key: 'rememberMe', value: 'true');
       await storage.write(key: 'deviceId', value: 'device-test');
       final service = LicenseService(
         storage: storage,
@@ -381,6 +383,7 @@ void main() {
       String? authorization;
       final storage = _MemoryLicenseStorage();
       await storage.write(key: 'authToken', value: 'token-test');
+      await storage.write(key: 'rememberMe', value: 'true');
       final service = LicenseService(
         storage: storage,
         client: MockClient((request) async {
@@ -410,6 +413,7 @@ void main() {
       final storage = _MemoryLicenseStorage();
       await storage.write(key: 'authToken', value: 'token-test');
       await storage.write(key: 'email', value: 'user@example.com');
+      await storage.write(key: 'rememberMe', value: 'true');
       await storage.write(key: 'cachedLicenseStatus', value: '{}');
       await storage.write(key: 'deviceId', value: 'device-test');
       final service = LicenseService(
@@ -421,7 +425,7 @@ void main() {
 
       expect(await service.hasActiveSession(), isFalse);
       expect(await storage.read(key: 'authToken'), isNull);
-      expect(await storage.read(key: 'email'), isNull);
+      expect(await storage.read(key: 'email'), 'user@example.com');
       expect(await storage.read(key: 'cachedLicenseStatus'), isNull);
       expect(await storage.read(key: 'deviceId'), 'device-test');
     });
@@ -429,6 +433,7 @@ void main() {
     test('hasActiveSession keeps token on network failure', () async {
       final storage = _MemoryLicenseStorage();
       await storage.write(key: 'authToken', value: 'token-test');
+      await storage.write(key: 'rememberMe', value: 'true');
       final service = LicenseService(
         storage: storage,
         client: MockClient((request) async {
@@ -449,6 +454,7 @@ void main() {
         final storage = _MemoryLicenseStorage();
         await storage.write(key: 'authToken', value: 'token-test');
         await storage.write(key: 'email', value: 'user@example.com');
+        await storage.write(key: 'rememberMe', value: 'true');
         await storage.write(key: 'cachedLicenseStatus', value: '{}');
         await storage.write(key: 'deviceId', value: 'device-test');
         final service = LicenseService(
@@ -472,7 +478,7 @@ void main() {
         expect(authorization, 'Bearer token-test');
         expect(payload, {'deviceId': 'device-test'});
         expect(await storage.read(key: 'authToken'), isNull);
-        expect(await storage.read(key: 'email'), isNull);
+        expect(await storage.read(key: 'email'), 'user@example.com');
         expect(await storage.read(key: 'cachedLicenseStatus'), isNull);
         expect(await storage.read(key: 'deviceId'), 'device-test');
       },
@@ -485,6 +491,7 @@ void main() {
         final storage = _MemoryLicenseStorage();
         await storage.write(key: 'authToken', value: 'token-test');
         await storage.write(key: 'email', value: 'user@example.com');
+        await storage.write(key: 'rememberMe', value: 'false');
         await storage.write(key: 'cachedLicenseStatus', value: '{}');
         await storage.write(key: 'deviceId', value: 'device-test');
         final service = LicenseService(

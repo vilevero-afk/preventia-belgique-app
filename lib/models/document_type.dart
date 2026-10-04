@@ -14,6 +14,10 @@ class DocumentType {
   final bool supportsActionSummary;
 }
 
+const electricalInstallationsRiskDocumentType =
+    'Analyse de risques — Installations électriques BT/HT';
+const elevatorRiskDocumentType = 'Analyse de risques — Ascenseur';
+
 const documentTypes = <DocumentType>[
   DocumentType(
     id: 'general_risk_analysis',
@@ -86,6 +90,20 @@ const documentTypes = <DocumentType>[
     supportsActionSummary: true,
   ),
   DocumentType(
+    id: 'electrical_installations_risk_analysis',
+    label: electricalInstallationsRiskDocumentType,
+    icon: 'electrical',
+    isRiskAnalysis: true,
+    supportsActionSummary: true,
+  ),
+  DocumentType(
+    id: 'elevator_risk_assessment',
+    label: elevatorRiskDocumentType,
+    icon: 'elevator',
+    isRiskAnalysis: true,
+    supportsActionSummary: true,
+  ),
+  DocumentType(
     id: 'annual_action_plan',
     label: 'Plan annuel d’action',
     icon: 'plan',
@@ -112,6 +130,11 @@ const documentTypes = <DocumentType>[
     label: 'Rapport d’accident ou d’incident',
     icon: 'incident',
     supportsActionSummary: true,
+  ),
+  DocumentType(
+    id: 'internal_emergency_plan',
+    label: 'Plan Interne d’Urgence',
+    icon: 'emergency',
   ),
 ];
 

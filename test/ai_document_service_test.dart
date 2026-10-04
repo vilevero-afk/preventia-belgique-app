@@ -119,6 +119,139 @@ void main() {
       expect(result.source, GenerationSource.aiBackend);
     });
 
+    test(
+      'sends the electrical installations document type and fields',
+      () async {
+        Map<String, dynamic>? payload;
+        final licenseStorage = _MemoryLicenseStorage();
+        await licenseStorage.write(
+          key: 'license_device_id',
+          value: 'device-test',
+        );
+        final service = AiDocumentService(
+          licenseService: LicenseService(storage: licenseStorage),
+          client: MockClient((request) async {
+            payload = jsonDecode(request.body) as Map<String, dynamic>;
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'document':
+                    '# Analyse de risques — Installations électriques BT/HT',
+              }),
+              200,
+              headers: const {
+                'content-type': 'application/json; charset=utf-8',
+              },
+            );
+          }),
+        );
+
+        await service.generateDocument(
+          backendUrl: AppConfigService.defaultBackendUrl,
+          data: _documentFormData(
+            documentType:
+                'Analyse de risques — Installations électriques BT/HT',
+            extraFields: const {
+              'installationType': 'mixte',
+              'rgieReportAvailable': 'oui',
+              'ba4Ba5ListAvailable': 'à vérifier',
+            },
+          ),
+          languageCode: 'fr',
+          languageLabel: 'Français',
+        );
+
+        expect(
+          payload?['documentType'],
+          'Analyse de risques — Installations électriques BT/HT',
+        );
+        final formData = payload?['formData'] as Map<String, dynamic>;
+        expect(
+          formData['documentType'],
+          'Analyse de risques — Installations électriques BT/HT',
+        );
+        expect(formData['companyName'], 'Entreprise test');
+        expect(formData['installationType'], 'mixte');
+        expect(formData['rgieReportAvailable'], 'oui');
+        expect(formData['ba4Ba5ListAvailable'], 'à vérifier');
+      },
+    );
+
+    test(
+      'sends exact elevator type and accepts the dedicated renderer',
+      () async {
+        Map<String, dynamic>? payload;
+        final licenseStorage = _MemoryLicenseStorage();
+        final service = AiDocumentService(
+          licenseService: LicenseService(storage: licenseStorage),
+          client: MockClient((request) async {
+            payload = jsonDecode(request.body) as Map<String, dynamic>;
+            return http.Response(
+              jsonEncode({
+                'success': true,
+                'document': '# Analyse de risques — Ascenseur\nSECT',
+              }),
+              200,
+              headers: const {
+                'content-type': 'application/json; charset=utf-8',
+              },
+            );
+          }),
+        );
+
+        final result = await service.generateDocument(
+          backendUrl: AppConfigService.defaultBackendUrl,
+          data: _documentFormData(
+            documentType: 'Analyse de risques — Ascenseur',
+            extraFields: const {'sect': 'À confirmer'},
+          ),
+          languageCode: 'fr',
+          languageLabel: 'Français',
+        );
+
+        expect(payload?['documentType'], 'Analyse de risques — Ascenseur');
+        expect(
+          (payload?['formData'] as Map<String, dynamic>)['documentType'],
+          'Analyse de risques — Ascenseur',
+        );
+        expect(result.content, contains('Analyse de risques — Ascenseur'));
+      },
+    );
+
+    test('rejects a generic response for a dedicated renderer', () async {
+      final service = AiDocumentService(
+        licenseService: LicenseService(storage: _MemoryLicenseStorage()),
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'success': true,
+              'document': '# Analyse de risques générale',
+            }),
+            200,
+            headers: const {'content-type': 'application/json; charset=utf-8'},
+          ),
+        ),
+      );
+
+      await expectLater(
+        service.generateDocument(
+          backendUrl: AppConfigService.defaultBackendUrl,
+          data: _documentFormData(
+            documentType: 'Analyse de risques — Ascenseur',
+          ),
+          languageCode: 'fr',
+          languageLabel: 'Français',
+        ),
+        throwsA(
+          isA<AiDocumentException>().having(
+            (error) => error.message,
+            'message',
+            contains('modèle Ascenseur attendu'),
+          ),
+        ),
+      );
+    });
+
     test('maps backend license errors to a clear message', () async {
       final licenseStorage = _MemoryLicenseStorage();
       await licenseStorage.write(key: 'license_key', value: 'LIC-TEST');
@@ -176,10 +309,13 @@ class _MemoryLicenseStorage implements LicenseStorage {
   }
 }
 
-DocumentFormData _documentFormData() {
+DocumentFormData _documentFormData({
+  String documentType = 'Analyse de risques générale',
+  Map<String, dynamic> extraFields = const {},
+}) {
   const value = 'Valeur test';
-  return const DocumentFormData(
-    documentType: 'Analyse de risques générale',
+  return DocumentFormData(
+    documentType: documentType,
     companyName: 'Entreprise test',
     siteConcerned: value,
     serviceConcerned: value,
@@ -244,5 +380,6 @@ DocumentFormData _documentFormData() {
     presentToCppt: value,
     externalServiceValidation: value,
     occupationalDoctorAdvice: value,
+    extraFields: extraFields,
   );
 }

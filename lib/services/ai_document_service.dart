@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/generation_source.dart';
 import '../models/document_form_data.dart';
+import '../models/document_type.dart';
 import 'app_config_service.dart';
 import 'license_service.dart';
 
@@ -119,6 +120,12 @@ class AiDocumentService {
       languageLabel: languageLabel,
       licenseService: licenseService,
     );
+    final loggedFormData = payload['formData'];
+    debugPrint('[PreventIA] generate documentType=${data.documentType}');
+    debugPrint('[PreventIA] backend documentType=${payload['documentType']}');
+    debugPrint(
+      '[PreventIA] formData keys=${loggedFormData is Map ? loggedFormData.keys.toList() : const <Object>[]}',
+    );
     final authToken = await licenseService.getAuthToken();
     final requestBody = jsonEncode(payload);
 
@@ -171,6 +178,10 @@ class AiDocumentService {
           'La réponse du backend IA ne contient pas de document.',
         );
       }
+      debugPrint(
+        '[PreventIA] backend response title=${_responseTitle(document)}',
+      );
+      _validateDedicatedRendererResponse(data.documentType, document);
 
       final source = GenerationSource.aiBackend;
       _debugLog(
@@ -195,6 +206,29 @@ class AiDocumentService {
       );
     }
   }
+
+  void _validateDedicatedRendererResponse(
+    String documentType,
+    String document,
+  ) {
+    if (documentType == elevatorRiskDocumentType &&
+        !document.contains(elevatorRiskDocumentType)) {
+      throw const AiDocumentException(
+        'Le backend n’a pas généré le modèle Ascenseur attendu. Vérifiez le documentType.',
+      );
+    }
+    if (documentType == electricalInstallationsRiskDocumentType &&
+        !document.contains('Installations électriques BT/HT')) {
+      throw const AiDocumentException(
+        'Le backend n’a pas généré le modèle Installations électriques BT/HT attendu. Vérifiez le documentType.',
+      );
+    }
+  }
+
+  String _responseTitle(String document) => document
+      .split('\n')
+      .map((line) => line.replaceFirst(RegExp(r'^#+\s*'), '').trim())
+      .firstWhere((line) => line.isNotEmpty, orElse: () => '(sans titre)');
 
   List<AiLinkedDocument> _extractLinkedDocuments(Map<String, dynamic> decoded) {
     final rawDocuments =

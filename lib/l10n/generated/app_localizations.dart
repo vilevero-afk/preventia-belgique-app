@@ -132,6 +132,36 @@ abstract class AppLocalizations {
   /// **'Documents de prévention'**
   String get preventionDocuments;
 
+  /// No description provided for @emergencyDocuments.
+  ///
+  /// In fr, this message translates to:
+  /// **'Documents d’urgence'**
+  String get emergencyDocuments;
+
+  /// No description provided for @piuTitle.
+  ///
+  /// In fr, this message translates to:
+  /// **'Plan Interne d’Urgence — PIU'**
+  String get piuTitle;
+
+  /// No description provided for @piuDescription.
+  ///
+  /// In fr, this message translates to:
+  /// **'Générer un plan opérationnel d’urgence interne.'**
+  String get piuDescription;
+
+  /// No description provided for @piuOperationalHelp.
+  ///
+  /// In fr, this message translates to:
+  /// **'Le PIU généré est une aide opérationnelle. Il doit être complété, vérifié sur site, adapté aux moyens réels et validé avant diffusion.'**
+  String get piuOperationalHelp;
+
+  /// No description provided for @piuShortAnswersHelp.
+  ///
+  /// In fr, this message translates to:
+  /// **'Privilégiez des réponses courtes. Les champs vides seront repris comme [à compléter].'**
+  String get piuShortAnswersHelp;
+
   /// No description provided for @generalRiskAnalysis.
   ///
   /// In fr, this message translates to:
@@ -251,6 +281,30 @@ abstract class AppLocalizations {
   /// In fr, this message translates to:
   /// **'Mot de passe'**
   String get password;
+
+  /// No description provided for @rememberMe.
+  ///
+  /// In fr, this message translates to:
+  /// **'Se souvenir de moi'**
+  String get rememberMe;
+
+  /// No description provided for @showPassword.
+  ///
+  /// In fr, this message translates to:
+  /// **'Afficher le mot de passe'**
+  String get showPassword;
+
+  /// No description provided for @hidePassword.
+  ///
+  /// In fr, this message translates to:
+  /// **'Masquer le mot de passe'**
+  String get hidePassword;
+
+  /// No description provided for @sessionExpired.
+  ///
+  /// In fr, this message translates to:
+  /// **'Session expirée, veuillez vous reconnecter'**
+  String get sessionExpired;
 
   /// No description provided for @signIn.
   ///

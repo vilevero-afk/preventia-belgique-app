@@ -24,7 +24,11 @@ class DocumentTypeScreen extends StatelessWidget {
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             final type = riskAnalysisTypes[index];
-            final title = type.isRiskAnalysis
+            final title = type.id == 'electrical_installations_risk_analysis'
+                ? 'Installations électriques BT/HT'
+                : type.id == 'elevator_risk_assessment'
+                ? 'Ascenseur'
+                : type.isRiskAnalysis
                 ? (type.label == 'Analyse de risques générale'
                       ? l10n.generalRiskAnalysis
                       : type.label)
@@ -33,13 +37,27 @@ class DocumentTypeScreen extends StatelessWidget {
               child: ListTile(
                 leading: Icon(_iconFor(type)),
                 title: Text(title),
+                subtitle: type.id == 'electrical_installations_risk_analysis'
+                    ? const Text(
+                        'Basse tension, haute tension, armoires, cabines, consignation, BA4/BA5.',
+                      )
+                    : type.id == 'elevator_risk_assessment'
+                    ? const Text(
+                        'Cabine, portes palières, gaine, cuvette, salle machines, SECT.',
+                      )
+                    : null,
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        DocumentFormScreen(documentType: type.label),
-                  ),
-                ),
+                onTap: () {
+                  debugPrint(
+                    '[PreventIA] selectedRiskAssessmentType=${type.label}',
+                  );
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          DocumentFormScreen(documentType: type.label),
+                    ),
+                  );
+                },
               ),
             );
           },
@@ -56,6 +74,8 @@ class DocumentTypeScreen extends StatelessWidget {
       'job' => Icons.badge_outlined,
       'instruction' => Icons.assignment_outlined,
       'incident' => Icons.report_problem_outlined,
+      'electrical' => Icons.electrical_services,
+      'elevator' => Icons.elevator,
       _ => Icons.health_and_safety_outlined,
     };
   }
