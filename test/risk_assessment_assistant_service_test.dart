@@ -167,4 +167,38 @@ void main() {
       expect(markdown, contains('Évaluer la gêne sonore en open space.'));
     },
   );
+  test('le scénario ergonomie remplit le questionnaire de base', () {
+    final answers = <String, String>{};
+    RiskAssessmentAssistantService.fillErgonomicsBaseQuestionnaire(answers);
+    expect(
+      answers['Où se situe la situation ?'],
+      contains(
+        'Postes administratifs sur écran du site administratif de Verviers',
+      ),
+    );
+    expect(
+      answers['Qui est exposé ?'],
+      contains('Personnel administratif, agents d’accueil'),
+    );
+    expect(answers['À quelle fréquence ?'], contains('5 à 7 heures par jour'));
+    final markdown = RiskAssessmentAssistantService.draft(
+      subject: 'Ergonomie',
+      answers: answers,
+      questions: [],
+      dangers: [],
+      conclusions: {},
+      decisions: {},
+    );
+    expect(
+      markdown,
+      contains(
+        'Postes administratifs sur écran du site administratif de Verviers',
+      ),
+    );
+    expect(markdown, contains('Personnel administratif, agents d’accueil'));
+    expect(
+      markdown,
+      isNot(contains('### Où se situe la situation ?\nÀ compléter')),
+    );
+  });
 }

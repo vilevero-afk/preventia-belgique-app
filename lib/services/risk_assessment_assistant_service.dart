@@ -158,6 +158,27 @@ class RiskAssessmentAssistantService {
     return questions.map(FieldQuestion.new).toList();
   }
 
+  static void fillErgonomicsBaseQuestionnaire(Map<String, String> answers) {
+    answers.addAll(const {
+      'Où se situe la situation ?':
+          'Postes administratifs sur écran du site administratif de Verviers : open space, bureaux individuels, poste d’accueil et postes en télétravail partiel.',
+      'Qui est exposé ?':
+          'Personnel administratif, agents d’accueil, direction et travailleurs en télétravail partiel.',
+      'Quelle tâche est réalisée ?':
+          'Travail prolongé sur écran, encodage administratif, traitement de dossiers, accueil téléphonique, accueil ponctuel du public, réunions, gestion du courrier et petits colis.',
+      'À quelle fréquence ?':
+          'Exposition quotidienne, environ 5 à 7 heures par jour sur écran selon les fonctions, avec interruptions liées aux appels, visiteurs et demandes internes.',
+      'Quels incidents, plaintes ou observations existent ?':
+          'Aucun accident confirmé lors du préremplissage. Des inconforts sont à vérifier : fatigue visuelle, douleurs nuque, épaules, dos ou poignets, gêne liée au bruit, interruptions fréquentes et difficultés de concentration.',
+      'Quelles mesures existent déjà ?':
+          'Chaises réglables disponibles pour la majorité des postes, écrans externes sur certains postes, éclairage général présent, télétravail partiel autorisé, pauses informelles selon l’organisation du travail. Aucun contrôle ergonomique systématique n’est encore réalisé.',
+      'Quels documents ou preuves sont disponibles ?':
+          'Inventaire des postes à compléter, photos terrain à réaliser, liste du matériel ergonomique à obtenir, retours travailleurs à collecter, politique télétravail à consulter, registre des plaintes ou demandes RH à vérifier.',
+      'Quelles photos faut-il prendre ?':
+          'Vue générale des postes, position écran/chaise/clavier/souris, poste accueil, câbles ou zones encombrées, reflets sur écran, zone courrier ou classement, poste en télétravail si accepté par le travailleur et sans données personnelles.',
+    });
+  }
+
   static void fillErgonomicsTest(List<FieldQuestion> questions) {
     const data = [
       (

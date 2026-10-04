@@ -76,7 +76,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
             : _subject.text.trim(),
       );
     }
+    RiskAssessmentAssistantService.fillErgonomicsBaseQuestionnaire(_answers);
     RiskAssessmentAssistantService.fillErgonomicsTest(_questions);
+    _revision++;
     _conclusions
       ..clear()
       ..addAll(
@@ -85,7 +87,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Questionnaire ergonomie rempli pour le scénario test.'),
+        content: Text('Questionnaire de base et scénario ergonomie remplis.'),
       ),
     );
   }
@@ -206,7 +208,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                 label,
                 _answers[label] ?? '',
                 (v) => _answers[label] = v,
-                key: ValueKey(label),
+                key: ValueKey('$label-$_revision'),
               ),
             ),
           ],
