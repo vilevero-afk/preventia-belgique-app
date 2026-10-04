@@ -2,11 +2,91 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../models/document_family.dart';
+import '../models/preventia_company_project.dart';
+import 'risk_assessment_assistant_service.dart';
 import 'pdf_export_service.dart';
 import 'risk_advisor_block_service.dart';
 
 class DocxExportService {
   const DocxExportService._();
+
+  static bool isAssistedRiskDraft(PreventiaCompanyDocument document) =>
+      document.isAssistedDraft ||
+      document.documentType == 'Analyse assistée de risques';
+
+  static String assistedRiskFileName(PreventiaCompanyDocument document) {
+    String slug(String value) {
+      var text = value.toLowerCase();
+      const accents = {
+        'é': 'e',
+        'è': 'e',
+        'ê': 'e',
+        'ë': 'e',
+        'à': 'a',
+        'â': 'a',
+        'ä': 'a',
+        'î': 'i',
+        'ï': 'i',
+        'ô': 'o',
+        'ö': 'o',
+        'ù': 'u',
+        'û': 'u',
+        'ü': 'u',
+        'ç': 'c',
+        'œ': 'oe',
+      };
+      for (final entry in accents.entries) {
+        text = text.replaceAll(entry.key, entry.value);
+      }
+      return text
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+          .replaceAll(RegExp(r'^_+|_+$'), '');
+    }
+
+    final date = document.createdAt;
+    return 'analyse_assistee_${slug(document.companyName)}_${slug(document.formData['subject']?.toString() ?? 'sujet')}_${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.docx';
+  }
+
+  static String assistedRiskExportMarkdown(PreventiaCompanyDocument document) {
+    final body = sanitizeAssistedRiskMarkdownForExport(document.markdown);
+    return sanitizeAssistedRiskMarkdownForExport(
+      '# Analyse assistée de risques\n\n'
+      'Référence : ${document.reference}\n'
+      'Date : ${_formatDate(document.createdAt)}\n'
+      'Entreprise : ${document.companyName}\n'
+      'Site : ${document.siteName.isEmpty ? 'À compléter' : document.siteName}\n'
+      'Sujet analysé : ${document.formData['subject'] ?? 'À compléter'}\n'
+      'Statut : Brouillon à vérifier et valider\n\n'
+      '${RiskAssessmentAssistantService.warning}\n\n$body\n\n'
+      '## Signatures / validation finale\n'
+      'Conseiller en prévention : ____________________\n'
+      'Employeur : ____________________\n'
+      'Date de validation : ____________________\n'
+      'Points à valider : observation terrain, cotations, actions et preuves.\n',
+    );
+  }
+
+  static Uint8List buildAssistedRiskAssessmentDocx(
+    PreventiaCompanyDocument document,
+  ) {
+    final builder = _DocxDocumentBuilder(
+      languageCode: 'fr',
+      footerReferenceNumber: null,
+    );
+    _appendMarkdownContent(
+      builder,
+      assistedRiskExportMarkdown(document),
+      'fr',
+      documentTitle: '',
+      enableAdvisorParsing: false,
+      appendValidationNotice: false,
+    );
+    return _OpenXmlPackage(
+      documentXml: builder.build(),
+      footerXml: '',
+      languageCode: 'fr',
+    ).toBytes();
+  }
 
   static const int _mainRiskFirstPartColumnCount = 16;
 
@@ -1372,3 +1452,42 @@ const _appXml = '''
   <Application>PreventIA Belgique</Application>
 </Properties>
 ''';
+
+String sanitizeAssistedRiskMarkdownForExport(String markdown) {
+  var text = markdown.replaceAll('\r\n', '\n');
+  text = text.replaceAll(
+    RegExp(
+      r'```(?:debug|json|log|logs)[^\n]*\n[\s\S]*?```',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  text = text.replaceAll(RegExp(r'<!--[\s\S]*?-->', multiLine: true), '');
+  text = text
+      .split('\n')
+      .where(
+        (line) => !RegExp(
+          r'Page\s+1\s*/\s*1|SC[ÉE]NARIO TEST SPGE|Document\s*:\s*Analyse de risques|^\s*(?:\[DEBUG\]|DEBUG\s*:)',
+          caseSensitive: false,
+        ).hasMatch(line),
+      )
+      .join('\n');
+  final lines = text.split('\n');
+  for (var i = lines.length - 1; i >= 0; i--) {
+    final heading = RegExp(r'^(#{1,6})\s').firstMatch(lines[i].trim());
+    if (heading == null || i == 0) continue;
+    var next = i + 1;
+    while (next < lines.length && lines[next].trim().isEmpty) {
+      next++;
+    }
+    final nextHeading = next < lines.length
+        ? RegExp(r'^(#{1,6})\s').firstMatch(lines[next].trim())
+        : null;
+    final level = heading.group(1)!.length;
+    final nextLevel = nextHeading?.group(1)?.length;
+    if (next == lines.length || (nextLevel != null && nextLevel <= level)) {
+      lines.removeAt(i);
+    }
+  }
+  return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+}

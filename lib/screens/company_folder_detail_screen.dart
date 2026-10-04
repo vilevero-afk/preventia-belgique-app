@@ -208,21 +208,26 @@ class _CompanyFolderDetailScreenState extends State<CompanyFolderDetailScreen> {
       _showMessage('Aucun markdown sauvegardé pour cette analyse.');
       return;
     }
-    final bytes = DocxExportService.buildRiskAssessmentDocx(
-      documentType: document.documentType,
-      content: document.markdown,
-      generatedAt: DateTime.now(),
-      referenceNumber: document.reference,
-    );
+    final assisted = DocxExportService.isAssistedRiskDraft(document);
+    final bytes = assisted
+        ? DocxExportService.buildAssistedRiskAssessmentDocx(document)
+        : DocxExportService.buildRiskAssessmentDocx(
+            documentType: document.documentType,
+            content: document.markdown,
+            generatedAt: DateTime.now(),
+            referenceNumber: document.reference,
+          );
     final l10n = AppLocalizations.of(context);
     final saved = await FileExportService.saveDocxBytes(
       bytes: bytes,
-      suggestedFileName: FileExportService.documentWordFileName(
-        projectTitle: _project?.companyName ?? document.companyName,
-        documentType: document.documentType,
-        languageCode: Localizations.localeOf(context).languageCode,
-        referenceNumber: document.reference,
-      ),
+      suggestedFileName: assisted
+          ? DocxExportService.assistedRiskFileName(document)
+          : FileExportService.documentWordFileName(
+              projectTitle: _project?.companyName ?? document.companyName,
+              documentType: document.documentType,
+              languageCode: Localizations.localeOf(context).languageCode,
+              referenceNumber: document.reference,
+            ),
       context: context,
       successMessage: l10n.wordDocumentGenerated,
       errorMessage: l10n.unableToGenerateWordDocument,
