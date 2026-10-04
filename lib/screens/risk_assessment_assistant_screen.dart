@@ -83,6 +83,11 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         RiskAssessmentAssistantService.conclusionsFor(_questions, _dangers),
       );
     setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Questionnaire ergonomie rempli pour le scénario test.'),
+      ),
+    );
   }
 
   void _next() {
@@ -169,7 +174,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
               OutlinedButton.icon(
                 onPressed: _fillErgonomicsTest,
                 icon: const Icon(Icons.science_outlined),
-                label: const Text('Remplir test ergonomie — rien n’est fait'),
+                label: const Text(
+                  'Remplir automatiquement — test ergonomie rien n’est fait',
+                ),
               ),
             ],
             if (_seededSubject != null) ...[
@@ -185,20 +192,36 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         );
       case 1:
         return Column(
-          children: RiskAssessmentAssistantService.questionnaire
-              .map(
-                (label) => _field(
-                  label,
-                  _answers[label] ?? '',
-                  (v) => _answers[label] = v,
-                  key: ValueKey(label),
+          children: [
+            if (_isErgonomics)
+              FilledButton.icon(
+                onPressed: _fillErgonomicsTest,
+                icon: const Icon(Icons.science_outlined),
+                label: const Text(
+                  'Remplir automatiquement — test ergonomie rien n’est fait',
                 ),
-              )
-              .toList(),
+              ),
+            ...RiskAssessmentAssistantService.questionnaire.map(
+              (label) => _field(
+                label,
+                _answers[label] ?? '',
+                (v) => _answers[label] = v,
+                key: ValueKey(label),
+              ),
+            ),
+          ],
         );
       case 2:
         return Column(
           children: [
+            if (_isErgonomics)
+              FilledButton.icon(
+                onPressed: _fillErgonomicsTest,
+                icon: const Icon(Icons.science_outlined),
+                label: const Text(
+                  'Remplir automatiquement — test ergonomie rien n’est fait',
+                ),
+              ),
             for (final q in _questions)
               Card(
                 key: ObjectKey(q),
@@ -215,7 +238,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                           DropdownMenuItem(value: 'non', child: Text('Non')),
                           DropdownMenuItem(
                             value: 'non_applicable',
-                            child: Text('N/A'),
+                            child: Text('Non applicable'),
                           ),
                           DropdownMenuItem(
                             value: 'a_verifier',

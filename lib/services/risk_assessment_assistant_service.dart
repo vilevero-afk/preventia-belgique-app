@@ -95,7 +95,7 @@ class RiskAssessmentAssistantService {
   static List<FieldQuestion> questionsFor(String subject) {
     final questions = switch (_category(subject)) {
       'ergonomie' => [
-        'La hauteur de l’écran est-elle adaptée ?',
+        'La hauteur de l’écran est-elle adaptée au travailleur ?',
         'La chaise est-elle réglable et correctement réglée ?',
         'Le clavier et la souris sont-ils positionnés de manière confortable ?',
         'Des reflets ou éblouissements sont-ils présents sur l’écran ?',
@@ -303,6 +303,13 @@ class RiskAssessmentAssistantService {
     return g * p * e;
   }
 
+  static String answerLabel(String answer) => switch (answer) {
+    'oui' => 'Oui',
+    'non' => 'Non',
+    'non_applicable' => 'Non applicable',
+    _ => 'À vérifier',
+  };
+
   static String level(int score) => score < 20
       ? 'faible'
       : score < 50
@@ -399,7 +406,7 @@ class RiskAssessmentAssistantService {
     b.writeln('|---|---|---|---|---|');
     for (final q in questions) {
       b.writeln(
-        '| ${q.text} | ${q.answer} | ${value(q.comment)} | ${value(q.evidenceExpected)} | ${q.photoRequired ? 'À prendre' : 'Non requise'} |',
+        '| ${q.text} | ${answerLabel(q.answer)} | ${value(q.comment)} | ${value(q.evidenceExpected)} | ${q.photoRequired ? 'À prendre' : 'Non requise'} |',
       );
     }
     final photos = questions

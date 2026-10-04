@@ -6,7 +6,10 @@ void main() {
     for (final subject in ['Ergonomie', 'ÉCRAN']) {
       final questions = RiskAssessmentAssistantService.questionsFor(subject);
       expect(questions.length, 10);
-      expect(questions.first.text, 'La hauteur de l’écran est-elle adaptée ?');
+      expect(
+        questions.first.text,
+        'La hauteur de l’écran est-elle adaptée au travailleur ?',
+      );
       expect(questions.every((q) => q.answer == 'a_verifier'), isTrue);
       expect(questions.every((q) => q.text.contains('?')), isTrue);
       expect(RiskAssessmentAssistantService.dangersFor(subject).length, 8);
@@ -121,4 +124,47 @@ void main() {
     expect(markdown, contains('Réglage impossible'));
     expect(markdown, contains('À prendre'));
   });
+  test(
+    'le scénario ergonomie rien n’est fait remplit les réponses lisibles',
+    () {
+      final questions = RiskAssessmentAssistantService.questionsFor(
+        'Ergonomie poste écran',
+      );
+      RiskAssessmentAssistantService.fillErgonomicsTest(questions);
+      expect(questions.first.answer, 'non');
+      expect(questions.first.comment, contains('hauteurs différentes'));
+      expect(questions.first.photoRequired, isTrue);
+      expect(questions.first.importance, 'élevée');
+      expect(
+        questions.any((q) => q.text.contains('reflets') && q.answer == 'oui'),
+        isTrue,
+      );
+      expect(
+        questions.any(
+          (q) => q.text.contains('télétravail') && q.answer == 'non',
+        ),
+        isTrue,
+      );
+      final markdown = RiskAssessmentAssistantService.draft(
+        subject: 'Ergonomie',
+        answers: {},
+        questions: questions,
+        dangers: [],
+        conclusions: RiskAssessmentAssistantService.conclusionsFor(
+          questions,
+          [],
+        ),
+        decisions: {},
+      );
+      expect(
+        markdown,
+        contains(
+          '| La hauteur de l’écran est-elle adaptée au travailleur ? | Non |',
+        ),
+      );
+      expect(markdown, isNot(contains('a_verifier')));
+      expect(markdown, contains('Adapter la hauteur des écrans.'));
+      expect(markdown, contains('Évaluer la gêne sonore en open space.'));
+    },
+  );
 }
