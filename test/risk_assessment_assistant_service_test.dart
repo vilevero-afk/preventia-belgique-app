@@ -5,9 +5,10 @@ void main() {
   test('ergonomie et écran proposent les questions et dangers attendus', () {
     for (final subject in ['Ergonomie', 'ÉCRAN']) {
       final questions = RiskAssessmentAssistantService.questionsFor(subject);
-      expect(questions.length, 9);
+      expect(questions.length, 10);
       expect(questions.first.text, 'La hauteur de l’écran est-elle adaptée ?');
-      expect(questions.every((q) => !q.verified), isTrue);
+      expect(questions.every((q) => q.answer == 'a_verifier'), isTrue);
+      expect(questions.every((q) => q.text.contains('?')), isTrue);
       expect(RiskAssessmentAssistantService.dangersFor(subject).length, 8);
     }
   });
@@ -15,7 +16,7 @@ void main() {
     for (final subject in ['Poste de travail administratif', 'Accueil']) {
       expect(
         RiskAssessmentAssistantService.questionsFor(subject).map((q) => q.text),
-        contains('Y a-t-il accueil du public ?'),
+        contains('Le poste accueille-t-il du public ?'),
       );
       expect(
         RiskAssessmentAssistantService.dangersFor(subject).map((d) => d.danger),
@@ -72,7 +73,7 @@ void main() {
       'Validation',
       'Mon sujet',
       'Bureau',
-      '[x] Question modifiée',
+      'Question | Réponse | Commentaire',
       'Danger personnalisé',
       'Score : 60',
       'Dégager le passage',
@@ -92,7 +93,32 @@ void main() {
     first.clear();
     expect(
       RiskAssessmentAssistantService.questionsFor('Accueil'),
-      hasLength(9),
+      hasLength(10),
     );
+  });
+
+  test('réponses structurées et conclusions automatiques', () {
+    final q = FieldQuestion('La chaise est-elle réglable ?')..answer = 'non';
+    q.comment = 'Réglage impossible';
+    q.evidenceExpected = 'Fiche mobilier';
+    q.photoRequired = true;
+    final verify = FieldQuestion('Le poste est-il documenté ?');
+    final conclusions = RiskAssessmentAssistantService.conclusionsFor([
+      q,
+      verify,
+    ], []);
+    expect(conclusions['Actions proposées'], contains('chaise'));
+    expect(conclusions['Points bloquants'], contains('poste est-il documenté'));
+    final markdown = RiskAssessmentAssistantService.draft(
+      subject: 'Ergonomie',
+      answers: {},
+      questions: [q],
+      dangers: [],
+      conclusions: conclusions,
+      decisions: {},
+    );
+    expect(markdown, contains('| Question | Réponse | Commentaire |'));
+    expect(markdown, contains('Réglage impossible'));
+    expect(markdown, contains('À prendre'));
   });
 }

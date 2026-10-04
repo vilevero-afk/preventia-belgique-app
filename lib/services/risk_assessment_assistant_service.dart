@@ -1,8 +1,24 @@
 /// Local, deterministic suggestions. No network or existing document storage.
 class FieldQuestion {
-  FieldQuestion(this.text, {this.verified = false});
+  FieldQuestion(
+    this.text, {
+    this.category = 'prévention',
+    this.answer = 'a_verifier',
+    this.status = 'brouillon',
+    this.importance = 'moyenne',
+  }) : id = 'Q-${DateTime.now().microsecondsSinceEpoch}';
+  final String id;
   String text;
-  bool verified;
+  String category;
+  String answer;
+  String comment = '';
+  String evidenceExpected = '';
+  bool photoRequired = false;
+  List<String> photoPaths = [];
+  String importance;
+  String status;
+  bool get verified => answer == 'oui' || status == 'vérifié';
+  set verified(bool value) => status = value ? 'vérifié' : 'à compléter';
 }
 
 class AssistantDanger {
@@ -80,25 +96,27 @@ class RiskAssessmentAssistantService {
     final questions = switch (_category(subject)) {
       'ergonomie' => [
         'La hauteur de l’écran est-elle adaptée ?',
-        'La chaise est-elle réglée correctement ?',
-        'Le clavier et la souris sont-ils bien positionnés ?',
-        'Y a-t-il des reflets sur l’écran ?',
-        'Les câbles gênent-ils le passage ?',
+        'La chaise est-elle réglable et correctement réglée ?',
+        'Le clavier et la souris sont-ils positionnés de manière confortable ?',
+        'Des reflets ou éblouissements sont-ils présents sur l’écran ?',
+        'Des câbles ou objets gênent-ils les passages autour du poste ?',
         'Le travailleur utilise-t-il un ordinateur portable sans support ?',
-        'Le poste en télétravail est-il vérifié ?',
-        'Des douleurs nuque, dos, épaules ou poignets sont-elles signalées ?',
-        'Les pauses ou alternances de tâches sont-elles suffisantes ?',
+        'Le poste en télétravail est-il vérifié ou documenté ?',
+        'Des douleurs au dos, à la nuque, aux épaules ou aux poignets sont-elles signalées ?',
+        'Des pauses ou alternances de tâches sont-elles organisées ?',
+        'Le niveau de bruit gêne-t-il la concentration ?',
       ],
       'poste' => [
-        'Quelles tâches sont réellement réalisées ?',
-        'Combien de temps le travailleur reste-t-il sur écran ?',
-        'Y a-t-il accueil du public ?',
-        'Existe-t-il des situations d’agressivité verbale ?',
-        'Existe-t-il un moyen d’alerte interne ?',
-        'Les visiteurs connaissent-ils les consignes d’évacuation ?',
-        'Le poste présente-t-il des câbles ou obstacles ?',
-        'Y a-t-il manutention de courrier ou petits colis ?',
-        'La confidentialité des données affichées est-elle assurée ?',
+        'Les tâches réellement effectuées correspondent-elles à la description du poste ?',
+        'Le travailleur reste-t-il plus de 4 heures par jour sur écran ?',
+        'Le poste accueille-t-il du public ?',
+        'Des situations d’agressivité verbale ou de tension avec visiteurs sont-elles possibles ?',
+        'Un moyen d’alerte interne est-il disponible au poste ?',
+        'Les visiteurs reçoivent-ils les consignes d’évacuation nécessaires ?',
+        'Des câbles ou obstacles créent-ils un risque de trébuchement ?',
+        'Le travailleur manipule-t-il régulièrement du courrier, des classeurs ou petits colis ?',
+        'Les données visibles à l’écran ou sur papier sont-elles protégées ?',
+        'Le travailleur peut-il être isolé ponctuellement à l’accueil ?',
       ],
       'incendie' => [
         'Les issues sont-elles dégagées ?',
@@ -131,7 +149,7 @@ class RiskAssessmentAssistantService {
         'Qui coordonne et surveille les interventions ?',
       ],
       _ => [
-        'Quelles tâches sont réellement réalisées ?',
+        'Les tâches réellement effectuées correspondent-elles à la description du poste ?',
         'Quels événements pourraient causer un dommage ?',
         'Quelles protections sont présentes et vérifiées ?',
         'Quelles preuves restent à recueillir ?',
@@ -220,12 +238,15 @@ class RiskAssessmentAssistantService {
       'Risques prioritaires': priority.isEmpty
           ? 'À déterminer après observation et cotation complète.'
           : priority.join('\n'),
-      'Actions proposées': dangers
-          .map(
-            (d) =>
-                'Vérifier ${d.danger} sur le terrain et définir les mesures adaptées.',
-          )
-          .join('\n'),
+      'Actions proposées': [
+        ...questions
+            .where((q) => q.answer == 'non')
+            .map((q) => 'Action proposée : vérifier ou corriger — ${q.text}.'),
+        ...dangers.map(
+          (d) =>
+              'Vérifier ${d.danger} sur le terrain et définir les mesures adaptées.',
+        ),
+      ].join('\n'),
       'Preuves manquantes': dangers
           .map(
             (d) =>
@@ -233,7 +254,7 @@ class RiskAssessmentAssistantService {
           )
           .join('\n'),
       'Points bloquants':
-          '${questions.where((q) => !q.verified).length} questions non vérifiées ; ${dangers.where((d) => d.score == null).length} dangers non cotés. Scénarios, exposition et preuves à valider.',
+          '${questions.where((q) => q.answer == 'a_verifier').map((q) => q.text).join('\n')}\n${questions.where((q) => q.answer == 'a_verifier').length} questions non vérifiées ; ${dangers.where((d) => d.score == null).length} dangers non cotés. Scénarios, exposition et preuves à valider.',
     };
   }
 
@@ -254,9 +275,20 @@ class RiskAssessmentAssistantService {
       b.writeln('\n### $label\n${value(answers[label])}');
     }
     b.writeln('\n## Questions terrain');
+    b.writeln('| Question | Réponse | Commentaire | Preuve attendue | Photo |');
+    b.writeln('|---|---|---|---|---|');
     for (final q in questions) {
-      b.writeln('- [${q.verified ? 'x' : ' '}] ${q.text}');
+      b.writeln(
+        '| ${q.text} | ${q.answer} | ${value(q.comment)} | ${value(q.evidenceExpected)} | ${q.photoRequired ? 'À prendre' : 'Non requise'} |',
+      );
     }
+    final photos = questions
+        .where((q) => q.photoRequired)
+        .map((q) => q.text)
+        .toList();
+    b.writeln(
+      '\n### Photos à prendre\n${photos.isEmpty ? 'Aucune photo requise à ce stade.' : photos.join('\n')}',
+    );
     b.writeln(
       '\n## Dangers et cotations provisoires\nÉchelle expérimentale : G, P, E de 1 à 5 ; score G × P × E. Faible < 20, moyen 20–49, élevé 50–99, critique 100–125. Seuils à valider.',
     );

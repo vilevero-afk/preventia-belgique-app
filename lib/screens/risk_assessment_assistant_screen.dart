@@ -174,17 +174,45 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                   child: Column(
                     children: [
                       _field('Question terrain', q.text, (v) => q.text = v),
+                      DropdownButtonFormField<String>(
+                        initialValue: q.answer,
+                        decoration: const InputDecoration(labelText: 'Réponse'),
+                        items: const [
+                          DropdownMenuItem(value: 'oui', child: Text('Oui')),
+                          DropdownMenuItem(value: 'non', child: Text('Non')),
+                          DropdownMenuItem(
+                            value: 'non_applicable',
+                            child: Text('N/A'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'a_verifier',
+                            child: Text('À vérifier'),
+                          ),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => q.answer = v ?? 'a_verifier'),
+                      ),
+                      _field('Commentaire', q.comment, (v) => q.comment = v),
+                      _field(
+                        'Preuve attendue',
+                        q.evidenceExpected,
+                        (v) => q.evidenceExpected = v,
+                      ),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Photo requise'),
+                        value: q.photoRequired,
+                        onChanged: (v) =>
+                            setState(() => q.photoRequired = v ?? false),
+                      ),
+                      if (q.photoRequired)
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('Photo à ajouter plus tard'),
+                        ),
                       Row(
                         children: [
-                          Expanded(
-                            child: CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Vérifié'),
-                              value: q.verified,
-                              onChanged: (v) =>
-                                  setState(() => q.verified = v ?? false),
-                            ),
-                          ),
+                          Expanded(child: Text('Statut : ${q.status}')),
                           IconButton(
                             tooltip: 'Supprimer la question',
                             onPressed: () =>
