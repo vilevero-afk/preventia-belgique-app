@@ -275,6 +275,10 @@ class RiskAssessmentAssistantService {
     b.writeln(
       '\n## Validation\nBrouillon non validé. Observation terrain, compléments et validation requis avant utilisation. Les choix PAA/PGP et PIU sont des intentions à valider, sans intégration automatique.',
     );
-    return b.toString();
+    return b
+        .toString()
+        .replaceAll(RegExp(r'Page\s+1\s*/\s*1', caseSensitive: false), '')
+        .replaceAll('SCÉNARIO TEST SPGE', '')
+        .replaceAll('SCENARIO TEST SPGE', '');
   }
 }

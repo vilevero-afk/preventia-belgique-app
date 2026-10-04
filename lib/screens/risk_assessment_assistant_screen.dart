@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/risk_assessment_assistant_service.dart';
+import '../services/preventia_company_project_service.dart';
 
 class RiskAssessmentAssistantScreen extends StatefulWidget {
   const RiskAssessmentAssistantScreen({super.key});
@@ -331,6 +332,12 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                 ),
               ),
             FilledButton.icon(
+              onPressed: _saving ? null : _saveToCompanyFolder,
+              icon: const Icon(Icons.folder_copy_outlined),
+              label: const Text('Sauvegarder dans le dossier société'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
               onPressed: _saving ? null : _createDraft,
               icon: const Icon(Icons.description_outlined),
               label: Text(
@@ -382,6 +389,35 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
           const SnackBar(
             content: Text(
               'Le brouillon n’a pas pu être enregistré localement. Réessayez.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _saveToCompanyFolder() async {
+    setState(() => _saving = true);
+    try {
+      final markdown = RiskAssessmentAssistantService.draft(
+        subject: _subject.text,
+        answers: _answers,
+        questions: _questions,
+        dangers: _dangers,
+        conclusions: _conclusions,
+        decisions: _decisions,
+      );
+      await PreventiaCompanyProjectService().saveAssistedDraft(
+        subject: _subject.text,
+        markdown: markdown,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Le brouillon d’analyse assistée a été sauvegardé dans le dossier société.',
             ),
           ),
         );

@@ -285,6 +285,7 @@ class PreventiaCompanyDocument {
     required this.title,
     required this.status,
     required this.createdAt,
+    DateTime? updatedAt,
     required this.autoCreated,
     required this.source,
     this.markdown = '',
@@ -294,13 +295,15 @@ class PreventiaCompanyDocument {
     this.formData = const {},
     this.wordPath,
     this.pdfPath,
-  });
+    this.isAssistedDraft = false,
+  }) : updatedAt = updatedAt ?? createdAt;
 
   final String id;
   final String documentType;
   final String title;
   final String status;
   final DateTime createdAt;
+  final DateTime updatedAt;
   final bool autoCreated;
   final String source;
   final String markdown;
@@ -310,8 +313,10 @@ class PreventiaCompanyDocument {
   final Map<String, dynamic> formData;
   final String? wordPath;
   final String? pdfPath;
+  final bool isAssistedDraft;
 
   PreventiaCompanyDocument copyWith({
+    DateTime? updatedAt,
     String? title,
     String? status,
     String? markdown,
@@ -321,12 +326,14 @@ class PreventiaCompanyDocument {
     Map<String, dynamic>? formData,
     String? wordPath,
     String? pdfPath,
+    bool? isAssistedDraft,
   }) => PreventiaCompanyDocument(
     id: id,
     documentType: documentType,
     title: title ?? this.title,
     status: status ?? this.status,
     createdAt: createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
     autoCreated: autoCreated,
     source: source,
     markdown: markdown ?? this.markdown,
@@ -336,6 +343,7 @@ class PreventiaCompanyDocument {
     formData: formData ?? this.formData,
     wordPath: wordPath ?? this.wordPath,
     pdfPath: pdfPath ?? this.pdfPath,
+    isAssistedDraft: isAssistedDraft ?? this.isAssistedDraft,
   );
 
   Map<String, dynamic> toJson() => {
@@ -344,6 +352,7 @@ class PreventiaCompanyDocument {
     'title': title,
     'status': status,
     'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
     'autoCreated': autoCreated,
     'source': source,
     'markdown': markdown,
@@ -353,6 +362,7 @@ class PreventiaCompanyDocument {
     'formData': formData,
     'wordPath': wordPath,
     'pdfPath': pdfPath,
+    'isAssistedDraft': isAssistedDraft,
   };
 
   factory PreventiaCompanyDocument.fromJson(Map<String, dynamic> json) =>
@@ -364,6 +374,7 @@ class PreventiaCompanyDocument {
         createdAt:
             DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0),
+        updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? ''),
         autoCreated: json['autoCreated'] == true,
         source: json['source']?.toString() ?? '',
         markdown: json['markdown']?.toString() ?? '',
@@ -375,6 +386,7 @@ class PreventiaCompanyDocument {
             : const {},
         wordPath: json['wordPath']?.toString(),
         pdfPath: json['pdfPath']?.toString(),
+        isAssistedDraft: json['isAssistedDraft'] == true,
       );
 }
 

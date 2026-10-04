@@ -352,6 +352,44 @@ class PreventiaCompanyProjectService {
     );
   }
 
+  Future<PreventiaCompanyProject> saveAssistedDraft({
+    required String subject,
+    required String markdown,
+    String? companyName,
+    String? siteName,
+  }) async {
+    final project = await _getOrCreateCompanyProject(
+      companyName ?? 'Société à compléter',
+    );
+    final now = DateTime.now();
+    final reference =
+        'AA-${now.year}-${_uuid.v4().substring(0, 4).toUpperCase()}';
+    final document = PreventiaCompanyDocument(
+      id: _uuid.v4(),
+      documentType: 'Analyse assistée de risques',
+      title: 'Analyse assistée — ${subject.trim()}',
+      status: 'Brouillon à valider',
+      createdAt: now,
+      updatedAt: now,
+      autoCreated: false,
+      source: 'assistant_local',
+      isAssistedDraft: true,
+      markdown: markdown,
+      reference: reference,
+      companyName: project.companyName,
+      siteName: siteName?.trim() ?? '',
+      formData: {'subject': subject.trim()},
+    );
+    final updated = project.copyWith(
+      updatedAt: now,
+      sites: _mergeSites(project.sites, document.siteName),
+      analyses: _mergeDocuments(project.analyses, [document]),
+      documents: _mergeDocuments(project.documents, [document]),
+    );
+    await saveProject(updated);
+    return await findByKey(updated.companyKey) ?? updated;
+  }
+
   Future<PreventiaCompanyProject> addRiskAssessmentToCompanyProject({
     required String documentType,
     required String markdown,
