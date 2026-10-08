@@ -19,7 +19,9 @@ import 'preventia_project_screen.dart';
 import 'risk_assessment_assistant_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({this.licenseService, super.key});
+
+  final LicenseService? licenseService;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -27,10 +29,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<PreventiaProject?> _projectFuture;
+  late final LicenseService _licenseService;
 
   @override
   void initState() {
     super.initState();
+    _licenseService = widget.licenseService ?? LicenseService();
     _projectFuture = PreventiaProjectService().getCurrentProject();
   }
 
@@ -38,6 +42,40 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
+      appBar: AppBar(actions: const [LanguageSelector()]),
+      drawer: Drawer(
+        child: SafeArea(
+          child: ListView(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.verified_user_outlined),
+                title: Text(l10n.subscriptionLicense),
+                onTap: () => _openLicense(),
+              ),
+              ListTile(
+                leading: const Icon(Icons.refresh_outlined),
+                title: Text(switch (l10n.localeName) {
+                  'nl' => 'Licentie vernieuwen',
+                  'en' => 'Refresh license',
+                  'de' => 'Lizenz aktualisieren',
+                  _ => 'Actualiser la licence',
+                }),
+                onTap: () => _openLicense(LicenseMenuAction.refresh),
+              ),
+              ListTile(
+                leading: const Icon(Icons.manage_accounts_outlined),
+                title: Text(l10n.manageSubscription),
+                onTap: () => _openLicense(LicenseMenuAction.manageSubscription),
+              ),
+              ListTile(
+                leading: const Icon(Icons.logout_outlined),
+                title: Text(l10n.logoutThisDevice),
+                onTap: () => _openLicense(LicenseMenuAction.logout),
+              ),
+            ],
+          ),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: AdaptivePage(
@@ -47,11 +85,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: LanguageSelector(),
-                ),
-                const SizedBox(height: 8),
                 Card(
                   elevation: 0,
                   child: Padding(
@@ -212,24 +245,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ConnectionState.waiting,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        TextButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => LicenseScreen(
-                                onContinue: () => Navigator.of(context).pop(),
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.verified_user_outlined),
-                          label: Text(l10n.subscriptionLicense),
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton.icon(
-                          onPressed: () => _confirmLogout(context),
-                          icon: const Icon(Icons.logout_outlined),
-                          label: const Text('Déconnexion'),
-                        ),
                       ],
                     ),
                   ),
@@ -301,43 +316,18 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
-  Future<void> _confirmLogout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final l10n = AppLocalizations.of(dialogContext);
-        return AlertDialog(
-          title: const Text('Déconnexion'),
-          content: Text(l10n.confirmLogoutDeviceMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Déconnexion'),
-            ),
-          ],
-        );
-      },
-    );
-    if (confirmed != true || !context.mounted) {
-      return;
-    }
-    final service = LicenseService();
-    try {
-      await service.logoutThisDevice();
-    } on Object catch (error) {
-      debugPrint('Home logout unavailable: $error');
-      await service.clearSession();
-    }
-    if (!context.mounted) {
-      return;
-    }
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const LicenseScreen()),
-      (route) => false,
+  void _openLicense([LicenseMenuAction? action]) {
+    Navigator.of(
+      context,
+    ).pop(); // Close the drawer before opening the existing page.
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LicenseScreen(
+          licenseService: _licenseService,
+          managementOnly: true,
+          initialAction: action,
+        ),
+      ),
     );
   }
 }

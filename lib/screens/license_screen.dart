@@ -10,11 +10,21 @@ import '../widgets/adaptive_page.dart';
 import 'home_screen.dart';
 import 'register_license_screen.dart';
 
+enum LicenseMenuAction { refresh, manageSubscription, logout }
+
 class LicenseScreen extends StatefulWidget {
-  const LicenseScreen({this.onContinue, this.licenseService, super.key});
+  const LicenseScreen({
+    this.onContinue,
+    this.licenseService,
+    this.managementOnly = false,
+    this.initialAction,
+    super.key,
+  });
 
   final VoidCallback? onContinue;
   final LicenseService? licenseService;
+  final bool managementOnly;
+  final LicenseMenuAction? initialAction;
 
   @override
   State<LicenseScreen> createState() => _LicenseScreenState();
@@ -54,7 +64,9 @@ class _LicenseScreenState extends State<LicenseScreen> {
       final token = await _service.getAuthToken();
       final status = token == null
           ? null
-          : await _service.getCurrentLicenseStatus(forceRefresh: true);
+          : await _service.getCurrentLicenseStatus(
+              forceRefresh: widget.initialAction != LicenseMenuAction.refresh,
+            );
       final tokenAfterCheck = await _service.getAuthToken();
       final sessionExpired = token != null && tokenAfterCheck == null;
       if (!mounted) {
@@ -66,10 +78,22 @@ class _LicenseScreenState extends State<LicenseScreen> {
       setState(() {
         _emailController.text = email ?? status?.email ?? '';
         _rememberMe = rememberMe;
-        _isLoggedIn = status?.isActive == true;
+        _isLoggedIn = status != null && tokenAfterCheck != null;
         _licenseStatus = status;
         _isLoading = false;
       });
+      if (_handleStatus(status)) return;
+      switch (widget.initialAction) {
+        case LicenseMenuAction.refresh:
+          await _refresh();
+        case LicenseMenuAction.manageSubscription:
+          await _manageSubscription();
+        case LicenseMenuAction.logout:
+          await _logoutThisDevice();
+        case null:
+          break;
+      }
+      if (!mounted) return;
       if (sessionExpired) {
         _showSnackBar(l10n(context).sessionExpired, isError: true);
       }
@@ -82,6 +106,7 @@ class _LicenseScreenState extends State<LicenseScreen> {
         _licenseStatus = null;
         _isLoading = false;
       });
+      if (_handleStatus(null)) return;
       _showSnackBar(error.message, isError: true);
     } on Object catch (error) {
       if (!mounted) {
@@ -92,6 +117,7 @@ class _LicenseScreenState extends State<LicenseScreen> {
         _licenseStatus = null;
         _isLoading = false;
       });
+      if (_handleStatus(null)) return;
       _showSnackBar(error.toString(), isError: true);
     }
   }
@@ -119,7 +145,14 @@ class _LicenseScreenState extends State<LicenseScreen> {
         _passwordController.clear();
         _obscurePassword = true;
       });
-      _showSnackBar(l10n(context).loginSuccessful, isError: false);
+      if (!_handleStatus(status)) {
+        _showSnackBar(
+          status.isExpired
+              ? l10n(context).expiredLicense
+              : l10n(context).loginSuccessful,
+          isError: !status.isActive || status.isExpired,
+        );
+      }
     } on LicenseException catch (error) {
       if (!mounted) {
         return;
@@ -148,6 +181,7 @@ class _LicenseScreenState extends State<LicenseScreen> {
         _isLoggedIn = status != null;
         _licenseStatus = status;
       });
+      _handleStatus(status);
     } on LicenseException catch (error) {
       if (!mounted) {
         return;
@@ -224,18 +258,39 @@ class _LicenseScreenState extends State<LicenseScreen> {
     await _performLogout(localOnly: false);
   }
 
+  bool _handleStatus(LicenseStatus? status) {
+    final active = status != null && status.isActive && !status.isExpired;
+    if (active && !widget.managementOnly) {
+      _continueToApp();
+      return true;
+    }
+    if (!active && widget.managementOnly) {
+      _openBlockingScreen();
+      return true;
+    }
+    return false;
+  }
+
+  void _openBlockingScreen() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => LicenseScreen(licenseService: _service),
+      ),
+      (route) => false,
+    );
+  }
+
   void _continueToApp() {
     final onContinue = widget.onContinue;
     if (onContinue != null) {
       onContinue();
       return;
     }
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-      return;
-    }
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => HomeScreen(licenseService: _service),
+      ),
+      (route) => false,
     );
   }
 
@@ -292,6 +347,7 @@ class _LicenseScreenState extends State<LicenseScreen> {
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
+        if (widget.managementOnly) _openBlockingScreen();
       }
     }
   }
@@ -346,7 +402,6 @@ class _LicenseScreenState extends State<LicenseScreen> {
                       onRefresh: _refresh,
                       onManageSubscription: _manageSubscription,
                       onLogout: _logoutThisDevice,
-                      onContinue: _continueToApp,
                     ),
                 ],
               ),
@@ -460,7 +515,6 @@ class _StatusPanel extends StatelessWidget {
     required this.onRefresh,
     required this.onManageSubscription,
     required this.onLogout,
-    required this.onContinue,
   });
 
   final LicenseStatus status;
@@ -468,7 +522,6 @@ class _StatusPanel extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onManageSubscription;
   final VoidCallback onLogout;
-  final VoidCallback? onContinue;
 
   @override
   Widget build(BuildContext context) {
@@ -479,8 +532,23 @@ class _StatusPanel extends StatelessWidget {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.verified_outlined),
-          title: Text(l10n.activeLicense),
+          leading: Icon(
+            status.isActive && !status.isExpired
+                ? Icons.verified_outlined
+                : Icons.warning_amber_outlined,
+          ),
+          title: Text(
+            status.isExpired
+                ? l10n.expiredLicense
+                : status.isActive
+                ? l10n.activeLicense
+                : switch (l10n.localeName) {
+                    'en' => 'Inactive license',
+                    'nl' => 'Inactieve licentie',
+                    'de' => 'Inaktive Lizenz',
+                    _ => 'Licence inactive',
+                  },
+          ),
           subtitle: Text(status.email),
         ),
         _InfoRow(label: l10n.emailAddress, value: status.email),
@@ -536,14 +604,6 @@ class _StatusPanel extends StatelessWidget {
             ),
           ],
         ),
-        if (onContinue != null) ...[
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: isSubmitting ? null : onContinue,
-            icon: const Icon(Icons.arrow_forward_outlined),
-            label: Text(l10n.continueToApp),
-          ),
-        ],
       ],
     );
   }

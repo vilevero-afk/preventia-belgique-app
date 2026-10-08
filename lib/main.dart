@@ -149,15 +149,24 @@ class _StartupGateState extends State<_StartupGate> {
 
   Future<void> _checkSession() async {
     final hasActiveSession = await widget.licenseService.hasActiveSession();
+    final status = hasActiveSession
+        ? await widget.licenseService.getCachedLicenseStatus()
+        : null;
+    final canOpenApp =
+        hasActiveSession &&
+        (status == null || (status.isActive && !status.isExpired));
     if (!mounted) {
       return;
     }
-    setState(() => _hasActiveSession = hasActiveSession);
+    setState(() => _hasActiveSession = canOpenApp);
   }
 
   void _openHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => HomeScreen(licenseService: widget.licenseService),
+      ),
+      (route) => false,
     );
   }
 
@@ -168,8 +177,11 @@ class _StartupGateState extends State<_StartupGate> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (hasActiveSession) {
-      return const HomeScreen();
+      return HomeScreen(licenseService: widget.licenseService);
     }
-    return LicenseScreen(onContinue: _openHome);
+    return LicenseScreen(
+      onContinue: _openHome,
+      licenseService: widget.licenseService,
+    );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:preventia_belgique_app/main.dart';
+import 'package:preventia_belgique_app/models/license_status.dart';
 import 'package:preventia_belgique_app/screens/document_form_screen.dart';
 import 'package:preventia_belgique_app/services/app_config_service.dart';
 import 'package:preventia_belgique_app/services/app_locale_controller.dart';
@@ -200,4 +201,7 @@ void main() {
 class _ActiveSessionLicenseService extends LicenseService {
   @override
   Future<bool> hasActiveSession() async => true;
+
+  @override
+  Future<LicenseStatus?> getCachedLicenseStatus() async => null;
 }
