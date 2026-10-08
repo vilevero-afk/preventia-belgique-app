@@ -7,23 +7,14 @@ import '../models/license_status.dart';
 import '../services/billing_service.dart';
 import '../services/license_service.dart';
 import '../widgets/adaptive_page.dart';
-import 'home_screen.dart';
 import 'login_screen.dart';
 
 enum LicenseMenuAction { refresh, manageSubscription, logout }
 
 class LicenseScreen extends StatefulWidget {
-  const LicenseScreen({
-    this.onContinue,
-    this.licenseService,
-    this.managementOnly = false,
-    this.initialAction,
-    super.key,
-  });
+  const LicenseScreen({this.licenseService, this.initialAction, super.key});
 
-  final VoidCallback? onContinue;
   final LicenseService? licenseService;
-  final bool managementOnly;
   final LicenseMenuAction? initialAction;
 
   @override
@@ -71,7 +62,6 @@ class _LicenseScreenState extends State<LicenseScreen> {
         _openLoginScreen();
         return;
       }
-      if (!widget.managementOnly && _handleStatus(status)) return;
       switch (widget.initialAction) {
         case LicenseMenuAction.refresh:
           await _refresh();
@@ -118,7 +108,6 @@ class _LicenseScreenState extends State<LicenseScreen> {
         if (mounted) _openLoginScreen();
         return;
       }
-      if (mounted) _handleStatus(status);
     } on LicenseException catch (error) {
       if (!mounted) {
         return;
@@ -195,46 +184,10 @@ class _LicenseScreenState extends State<LicenseScreen> {
     await _performLogout(localOnly: false);
   }
 
-  bool _handleStatus(LicenseStatus? status) {
-    final active = status != null && status.isActive && !status.isExpired;
-    if (active && !widget.managementOnly) {
-      _continueToApp();
-      return true;
-    }
-    if (!active && widget.managementOnly) {
-      _openBlockingScreen();
-      return true;
-    }
-    return false;
-  }
-
   void _openLoginScreen() {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
         builder: (_) => LoginScreen(licenseService: _service),
-      ),
-      (route) => false,
-    );
-  }
-
-  void _openBlockingScreen() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => LicenseScreen(licenseService: _service),
-      ),
-      (route) => false,
-    );
-  }
-
-  void _continueToApp() {
-    final onContinue = widget.onContinue;
-    if (onContinue != null) {
-      onContinue();
-      return;
-    }
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => HomeScreen(licenseService: _service),
       ),
       (route) => false,
     );

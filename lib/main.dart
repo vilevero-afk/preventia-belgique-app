@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'l10n/generated/app_localizations.dart';
-import 'screens/license_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/app_config_service.dart';
 import 'services/app_locale_controller.dart';
@@ -140,8 +139,7 @@ class _StartupGate extends StatefulWidget {
 }
 
 class _StartupGateState extends State<_StartupGate> {
-  bool? _hasActiveSession;
-  bool _hasToken = false;
+  bool? _hasSession;
 
   @override
   void initState() {
@@ -150,46 +148,24 @@ class _StartupGateState extends State<_StartupGate> {
   }
 
   Future<void> _checkSession() async {
-    final hasActiveSession = await widget.licenseService.hasActiveSession();
-    final status = hasActiveSession
-        ? await widget.licenseService.getCachedLicenseStatus()
-        : null;
-    final canOpenApp =
-        hasActiveSession &&
-        (status == null || (status.isActive && !status.isExpired));
-    if (!mounted) {
-      return;
+    try {
+      final token = await widget.licenseService.getAuthToken();
+      if (!mounted) return;
+      setState(() => _hasSession = token != null && token.trim().isNotEmpty);
+    } on Object catch (error) {
+      debugPrint('Local session unavailable: $error');
+      if (mounted) setState(() => _hasSession = false);
     }
-    final token = await widget.licenseService.getAuthToken();
-    if (!mounted) return;
-    setState(() {
-      _hasActiveSession = canOpenApp && token != null;
-      _hasToken = token != null;
-    });
-  }
-
-  void _openHome() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(
-        builder: (_) => HomeScreen(licenseService: widget.licenseService),
-      ),
-      (route) => false,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasActiveSession = _hasActiveSession;
-    if (hasActiveSession == null) {
+    final hasSession = _hasSession;
+    if (hasSession == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (hasActiveSession) {
-      return HomeScreen(licenseService: widget.licenseService);
-    }
-    if (!_hasToken) return LoginScreen(licenseService: widget.licenseService);
-    return LicenseScreen(
-      onContinue: _openHome,
-      licenseService: widget.licenseService,
-    );
+    return hasSession
+        ? HomeScreen(licenseService: widget.licenseService)
+        : LoginScreen(licenseService: widget.licenseService);
   }
 }

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
-import '../models/license_status.dart';
 import '../services/license_service.dart';
 import '../widgets/adaptive_page.dart';
 import 'home_screen.dart';
-import 'license_screen.dart';
 import 'register_license_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -53,14 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _openDestination(LicenseStatus status) {
-    Navigator.of(context).pushAndRemoveUntil(
+  void _openHome() {
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => status.isActive && !status.isExpired
-            ? HomeScreen(licenseService: _service)
-            : LicenseScreen(licenseService: _service),
+        builder: (_) => HomeScreen(licenseService: _service),
       ),
-      (route) => false,
     );
   }
 
@@ -127,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.clear();
         _obscurePassword = true;
       });
-      _openDestination(status);
+      _openHome();
     } on LicenseException catch (error) {
       if (!mounted) {
         return;

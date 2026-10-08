@@ -324,7 +324,6 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LicenseScreen(
           licenseService: _licenseService,
-          managementOnly: true,
           initialAction: action,
         ),
       ),

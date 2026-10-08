@@ -32,11 +32,16 @@ class _LicenseService extends LicenseService {
   LicenseStatus? nextStatus;
   String? token;
   int loginCalls = 0;
+  int sessionCheckCalls = 0;
   int refreshCalls = 0;
   int logoutCalls = 0;
 
   @override
-  Future<bool> hasActiveSession() async => token != null && status.isActive;
+  Future<bool> hasActiveSession() async {
+    sessionCheckCalls++;
+    return token != null && status.isActive;
+  }
+
   @override
   Future<LicenseStatus?> getCachedLicenseStatus() async =>
       token == null ? null : status;
@@ -173,17 +178,18 @@ void main() {
     );
   }
 
-  testWidgets('licence absente avec session affiche le blocage', (
-    tester,
-  ) async {
-    await openApp(
-      tester,
-      _LicenseService(LicenseStatus.inactive(), token: 'test'),
-    );
-    expect(find.byType(LicenseScreen), findsOneWidget);
-    expect(find.byType(LoginScreen), findsNothing);
-    expect(find.byType(HomeScreen), findsNothing);
-  });
+  testWidgets(
+    'licence absente avec session ouvre l’accueil sans écran licence',
+    (tester) async {
+      await openApp(
+        tester,
+        _LicenseService(LicenseStatus.inactive(), token: 'test'),
+      );
+      expect(find.byType(LicenseScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'connexion active ouvre directement l’accueil sans écran licence',
@@ -202,6 +208,20 @@ void main() {
       );
     },
   );
+
+  for (final license in [status(active: false), LicenseStatus.inactive()]) {
+    testWidgets(
+      'session locale ${license.licenseType} ouvre l’accueil sans consulter la licence',
+      (tester) async {
+        final service = _LicenseService(license, token: 'test');
+        await openApp(tester, service);
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(find.byType(LicenseScreen), findsNothing);
+        expect(service.sessionCheckCalls, 0);
+        expect(service.refreshCalls, 0);
+      },
+    );
+  }
 
   testWidgets('session active au démarrage ouvre directement l’accueil', (
     tester,
@@ -249,37 +269,34 @@ void main() {
 
   for (final expired in [false, true]) {
     testWidgets(
-      'connexion avec licence ${expired ? 'expirée' : 'inactive'} bloque l’accueil',
+      'connexion avec licence ${expired ? 'expirée' : 'inactive'} ouvre directement l’accueil',
       (tester) async {
         await openApp(
           tester,
           _LicenseService(status(active: expired, expired: expired)),
         );
         await login(tester);
-        expect(find.byType(HomeScreen), findsNothing);
-        expect(find.byType(LicenseScreen), findsOneWidget);
-        expect(
-          find.text(expired ? 'Licence expirée' : 'Licence inactive'),
-          findsWidgets,
-        );
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(find.byType(LicenseScreen), findsNothing);
+        expect(find.byType(LoginScreen), findsNothing);
         expect(find.text('Continuer vers l’application'), findsNothing);
       },
     );
   }
 
-  testWidgets('une session déjà connectée mais expirée reste bloquée', (
+  testWidgets('une session déjà connectée mais expirée ouvre l’accueil', (
     tester,
   ) async {
     await openApp(
       tester,
       _LicenseService(status(expired: true), token: 'test'),
     );
-    expect(find.byType(HomeScreen), findsNothing);
-    expect(find.text('Licence expirée'), findsOneWidget);
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.byType(LicenseScreen), findsNothing);
   });
 
   testWidgets(
-    'actualiser utilise la logique existante et bloque une licence devenue invalide',
+    'actualiser conserve le retour à l’accueil avec une licence inactive',
     (tester) async {
       final service = _LicenseService(status(), token: 'test');
       await openApp(tester, service);
@@ -290,10 +307,14 @@ void main() {
       expect(find.text('Licence inactive'), findsOneWidget);
       expect(
         Navigator.of(tester.element(find.byType(LicenseScreen))).canPop(),
-        isFalse,
+        isTrue,
       );
       service.nextStatus = status();
       await tester.tap(find.text('Actualiser'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LicenseScreen), findsOneWidget);
+      expect(find.text('Licence active'), findsOneWidget);
+      await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       expect(find.byType(HomeScreen), findsOneWidget);
     },
