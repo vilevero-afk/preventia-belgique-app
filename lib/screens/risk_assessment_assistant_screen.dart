@@ -491,7 +491,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         (v) => setState(() => review.deadline = v),
       ),
       _field(
-        'Preuve attendue',
+        review is AssistantDanger
+            ? 'Preuve finale attendue'
+            : 'Preuve attendue',
         review.finalEvidence,
         (v) => setState(() => review.finalEvidence = v),
       ),
@@ -730,6 +732,29 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     );
   }
 
+  String? get _finalBlockReason {
+    if (_actions.any(
+      (a) =>
+          a.retained &&
+          [
+            a.responsible,
+            a.deadline,
+            a.finalEvidence,
+          ].any((v) => v.trim().isEmpty),
+    )) {
+      return 'Complétez responsable, délai et preuve attendue pour les actions acceptées.';
+    }
+    final errors = RiskAssessmentAssistantService.validationErrors(
+      _dangers,
+      _actions,
+    );
+    if (errors.isNotEmpty) return errors.first;
+    if (_advisor.trim().isEmpty || _finalConclusion.trim().isEmpty) {
+      return 'Complétez le nom du conseiller et sa conclusion finale.';
+    }
+    return null;
+  }
+
   Widget _documentControls() => Padding(
     padding: const EdgeInsets.all(12),
     child: Wrap(
@@ -781,8 +806,11 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
             onPressed: _saving ? null : _fillValidationTest,
             child: const Text('Remplir validation test'),
           ),
+          if (_finalBlockReason != null) Text(_finalBlockReason!),
           FilledButton(
-            onPressed: _saving ? null : _createFinal,
+            onPressed: _saving || _finalBlockReason != null
+                ? null
+                : _createFinal,
             child: const Text('Créer l’analyse finale'),
           ),
         ],

@@ -48,6 +48,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Actions proposées'), findsOneWidget);
       expect(find.text('Créer l’analyse finale').hitTestable(), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Créer l’analyse finale'),
+            )
+            .onPressed,
+        isNull,
+      );
       await tester.tap(find.text('Remplir validation test'));
       await tester.pumpAndSettle();
       expect(
@@ -69,6 +77,14 @@ void main() {
               w.initialValue == 'Photo après correction ou preuve documentaire',
         ),
         findsWidgets,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Créer l’analyse finale'),
+            )
+            .onPressed,
+        isNotNull,
       );
       await tester.tap(find.text('Créer l’analyse finale'));
       await tester.pumpAndSettle();
@@ -239,8 +255,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(responsible, '');
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Créer l’analyse finale'));
-    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Créer l’analyse finale'),
+          )
+          .onPressed,
+      isNull,
+    );
     expect(
       find.text(
         'Complétez responsable, délai et preuve attendue pour les actions acceptées.',

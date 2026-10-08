@@ -74,6 +74,18 @@ void main() {
     expect(text, contains('Passage dégagé ?'));
     expect(text, isNot(contains('PIU')));
   });
+  test('un danger refusé est exclu des dangers et cotations finales', () {
+    danger.decision = AdvisorDecision.refused;
+    final text = finalText([action]);
+    final retainedDangers = text
+        .split('## Dangers retenus et cotations finales')
+        .last
+        .split('## Plan d’action retenu')
+        .first;
+    expect(retainedDangers, isNot(contains('Chute')));
+    expect(text, contains('Balisage'));
+  });
+
   test(
     'le dossier prévention et le PAA/PGP reçoivent uniquement les actions retenues',
     () async {
