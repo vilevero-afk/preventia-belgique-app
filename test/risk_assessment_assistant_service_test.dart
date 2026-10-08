@@ -53,6 +53,216 @@ void main() {
     },
   );
 
+  test(
+    'scénario ergonomie complet : questionnaire, terrain, huit dangers cotés et onze actions concrètes',
+    () {
+      final answers = <String, String>{};
+      final questions = RiskAssessmentAssistantService.questionsFor(
+        'Ergonomie poste écran',
+      );
+      final dangers = RiskAssessmentAssistantService.dangersFor(
+        'Ergonomie poste écran',
+      );
+      RiskAssessmentAssistantService.fillErgonomicsBaseQuestionnaire(answers);
+      RiskAssessmentAssistantService.fillErgonomicsTest(questions);
+      RiskAssessmentAssistantService.fillErgonomicsDangersTest(dangers);
+      expect(answers.length, 8);
+      expect(
+        questions.map(
+          (q) => RiskAssessmentAssistantService.answerLabel(q.answer),
+        ),
+        ['Non', 'Non', 'Non', 'Oui', 'Oui', 'Oui', 'Non', 'Oui', 'Non', 'Oui'],
+      );
+      expect(questions.map((q) => q.photoRequired), [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+      ]);
+      expect(questions.map((q) => q.importance), [
+        'élevée',
+        'élevée',
+        'moyenne',
+        'élevée',
+        'élevée',
+        'moyenne',
+        'moyenne',
+        'élevée',
+        'moyenne',
+        'moyenne',
+      ]);
+      expect(
+        questions.every(
+          (q) => q.comment.isNotEmpty && q.evidenceExpected.isNotEmpty,
+        ),
+        isTrue,
+      );
+      expect(dangers, hasLength(8));
+      expect(dangers.map((d) => d.score), [36, 36, 36, 24, 27, 27, 27, 12]);
+      expect(dangers.map((d) => d.level), [
+        'moyen',
+        'moyen',
+        'moyen',
+        'moyen',
+        'moyen',
+        'moyen',
+        'moyen',
+        'faible',
+      ]);
+      for (final d in dangers) {
+        expect(
+          [
+            d.scenario,
+            d.people,
+            d.measures,
+            d.evidence,
+            d.photo,
+          ].every((v) => v.isNotEmpty),
+          isTrue,
+        );
+        expect(d.gravity, isNotNull);
+        expect(d.probability, isNotNull);
+        expect(d.exposure, isNotNull);
+      }
+      final conclusions = RiskAssessmentAssistantService.conclusionsFor(
+        questions,
+        dangers,
+      );
+      final actions = RiskAssessmentAssistantService.actionsFor(
+        dangers,
+        conclusions['Actions proposées']!,
+      );
+      expect(actions, hasLength(11));
+      expect(
+        actions.every((a) => a.linkedRisk != 'À préciser par le conseiller'),
+        isTrue,
+      );
+      for (final action in RiskAssessmentAssistantService.ergonomicsActions) {
+        expect(actions.map((a) => a.action), contains(action));
+      }
+      final markdown = RiskAssessmentAssistantService.draft(
+        subject: 'Ergonomie poste écran',
+        answers: answers,
+        questions: questions,
+        dangers: dangers,
+        conclusions: conclusions,
+        decisions: {},
+      );
+      final questionnaire = markdown
+          .split('## Questionnaire de base')
+          .last
+          .split('## Questions terrain')
+          .first;
+      expect(questionnaire, isNot(contains('À compléter')));
+      for (final text in [
+        'Postes administratifs sur écran du site administratif de Verviers',
+        'Personnel administratif, agents d’accueil',
+        '5 à 7 heures par jour',
+        'Score : 36',
+        'Niveau : moyen',
+      ]) {
+        expect(markdown, contains(text));
+      }
+      for (final text in [
+        'Non coté',
+        'Scénario plausible : À compléter',
+        'Personnes exposées : À compléter',
+        'Mesures existantes : À compléter',
+        'Vérifier Posture assise prolongée sur le terrain',
+        'Vérifier Hauteur écran inadaptée sur le terrain',
+        'a_verifier',
+        'non_applicable',
+        'Intégration PIU',
+      ]) {
+        expect(markdown, isNot(contains(text)));
+      }
+    },
+  );
+
+  test(
+    'constructeur pur du document final : métadonnées, statut, avis et séparation des décisions',
+    () {
+      final danger = AssistantDanger('Chute')
+        ..decision = AdvisorDecision.accepted
+        ..gravity = 3
+        ..probability = 3
+        ..exposure = 4;
+      final accepted =
+          AssistantAction('Installer un balisage', linkedRisk: 'Chute')
+            ..decision = AdvisorDecision.accepted
+            ..responsible = 'Service prévention'
+            ..deadline = '3 mois'
+            ..finalEvidence = 'Photo après correction'
+            ..advisorComment = 'À vérifier sur site.';
+      final refused = AssistantAction('Acheter un équipement')
+        ..decision = AdvisorDecision.refused
+        ..advisorComment = 'Mesure non adaptée.';
+      String build(
+        bool validated,
+      ) => RiskAssessmentAssistantService.buildFinalAssistedRiskMarkdown(
+        subject: 'Ergonomie poste écran',
+        reference: 'AA-2026-001',
+        date: DateTime(2026, 10, 8),
+        companyName: 'SPGE',
+        siteName: 'Verviers',
+        answers: {'Qui est exposé ?': 'Personnel'},
+        questions: [FieldQuestion('Question à vérifier ?')],
+        dangers: [danger],
+        actions: [accepted, refused],
+        advisor: 'Conseiller',
+        conclusion:
+            'Sécuriser les passages.\nPage 1 / 1\nSCÉNARIO TEST SPGE\na_verifier\nIntégration PIU',
+        validated: validated,
+      );
+      final text = build(false);
+      expect(build(false), text);
+      for (final value in [
+        'Analyse finale assistée de risques',
+        'AA-2026-001',
+        '08/10/2026',
+        'Entreprise : SPGE',
+        'Site : Verviers',
+        'Sujet analysé : Ergonomie poste écran',
+        'Statut : Analyse finale à valider',
+        RiskAssessmentAssistantService.finalNotice,
+        RiskAssessmentAssistantService.warning,
+        'Service prévention',
+        '3 mois',
+        'Photo après correction',
+        'Commentaire conseiller : À vérifier sur site.',
+        'Signatures',
+      ]) {
+        expect(text, contains(value));
+      }
+      final sections = text.split('## Actions écartées ou refusées');
+      final plan = sections.first.split('## Plan d’action retenu').last;
+      expect(plan, contains('Installer un balisage'));
+      expect(plan, isNot(contains('Acheter un équipement')));
+      expect(sections.first, isNot(contains('Acheter un équipement')));
+      expect(sections.last, contains('Acheter un équipement'));
+      expect(sections.last, contains('Mesure non adaptée.'));
+      for (final value in [
+        'Page 1 / 1',
+        'SCÉNARIO TEST SPGE',
+        'a_verifier',
+        'Intégration PIU',
+        'Brouillon non validé',
+      ]) {
+        expect(text, isNot(contains(value)));
+      }
+      expect(build(true), contains('Statut : Analyse finale validée'));
+      expect(build(true), contains('Document validé par le conseiller'));
+      refused.decision = AdvisorDecision.accepted;
+      expect(() => build(false), throwsStateError);
+    },
+  );
+
   test('ergonomie et écran proposent les questions et dangers attendus', () {
     for (final subject in ['Ergonomie', 'ÉCRAN']) {
       final questions = RiskAssessmentAssistantService.questionsFor(subject);

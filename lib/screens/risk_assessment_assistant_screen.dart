@@ -25,6 +25,11 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   List<AssistantDanger> _dangers = [];
   List<AssistantAction> _actions = [];
   String _status = 'Brouillon';
+  String _companyName = '';
+  String _siteName = '';
+  String _documentReference = '';
+  DateTime? _documentDate;
+  bool _testValidation = false;
   String _advisor = '';
   String _finalConclusion = '';
   String? _finalMarkdown;
@@ -40,7 +45,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     'Questions terrain proposées',
     'Dangers identifiés',
     'Cotation provisoire',
-    'Conclusions proposées',
+    'Actions et conclusions proposées',
     'Validation de l’analyse',
   ];
 
@@ -78,27 +83,20 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       _subject.text.toLowerCase().contains('poste écran');
 
   void _fillErgonomicsTest() {
-    if (_questions.isEmpty) {
-      _seed(
-        _subject.text.trim().isEmpty
-            ? 'Ergonomie poste écran'
-            : _subject.text.trim(),
-      );
-    }
-    RiskAssessmentAssistantService.fillErgonomicsBaseQuestionnaire(_answers);
-    RiskAssessmentAssistantService.fillErgonomicsTest(_questions);
-    _revision++;
-    _conclusions
-      ..clear()
-      ..addAll(
+    setState(() {
+      final subject = _subject.text.trim().isEmpty
+          ? 'Ergonomie poste écran'
+          : _subject.text.trim();
+      _subject.text = subject;
+      _seed(subject);
+      RiskAssessmentAssistantService.fillErgonomicsBaseQuestionnaire(_answers);
+      RiskAssessmentAssistantService.fillErgonomicsTest(_questions);
+      RiskAssessmentAssistantService.fillErgonomicsDangersTest(_dangers);
+      _conclusions.addAll(
         RiskAssessmentAssistantService.conclusionsFor(_questions, _dangers),
       );
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Questionnaire de base et scénario ergonomie remplis.'),
-      ),
-    );
+    });
+    _message('Questionnaire de base et scénario ergonomie remplis.');
   }
 
   void _next() {
@@ -133,6 +131,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     _conclusions.clear();
     _actions.clear();
     _draftCreated = false;
+    _testValidation = false;
     _finalMarkdown = null;
     _status = 'Brouillon';
     _revision++;
@@ -170,12 +169,15 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
           children: [
             TextField(
               controller: _subject,
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 labelText: 'Quel sujet voulez-vous analyser ?',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
+            _field('Entreprise', _companyName, (v) => _companyName = v),
+            _field('Site', _siteName, (v) => _siteName = v),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -242,7 +244,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
               ),
             for (final q in _questions)
               Card(
-                key: ObjectKey(q),
+                key: ValueKey((q, _revision)),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -279,11 +281,24 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                         onChanged: (v) =>
                             setState(() => q.photoRequired = v ?? false),
                       ),
-                      if (q.photoRequired)
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Photo à ajouter plus tard'),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Photo : ${q.photoRequired ? 'À prendre' : 'Non requise'}',
                         ),
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: q.importance,
+                        decoration: const InputDecoration(
+                          labelText: 'Importance',
+                        ),
+                        items: ['faible', 'moyenne', 'élevée']
+                            .map(
+                              (v) => DropdownMenuItem(value: v, child: Text(v)),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() => q.importance = v!),
+                      ),
                       Row(
                         children: [
                           Expanded(child: Text('Statut : ${q.status}')),
@@ -487,7 +502,11 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     if (_finalMarkdown != null) {
       return Column(
         children: [
-          const Text('Document validé par le conseiller.'),
+          Text(
+            _testValidation
+                ? 'Analyse finale à vérifier et valider.'
+                : 'Document validé par le conseiller.',
+          ),
           TextButton(
             onPressed: () => _showDraft(_finalMarkdown!),
             child: const Text('Consulter l’analyse finale'),
@@ -601,6 +620,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   }
 
   Future<void> _createFinal() async {
+    if (_step != 6) _startValidation();
     final missingDetails = _actions.any(
       (a) =>
           a.retained &&
@@ -628,15 +648,22 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       _message('Complétez le nom du conseiller et sa conclusion finale.');
       return;
     }
-    final markdown = RiskAssessmentAssistantService.finalAnalysis(
-      subject: _subject.text,
-      answers: _answers,
-      questions: _questions,
-      dangers: _dangers,
-      actions: _actions,
-      conclusion: _finalConclusion,
-      advisor: _advisor,
-    );
+    final date = DateTime.now();
+    final markdown =
+        RiskAssessmentAssistantService.buildFinalAssistedRiskMarkdown(
+          subject: _subject.text,
+          answers: _answers,
+          questions: _questions,
+          dangers: _dangers,
+          actions: _actions,
+          conclusion: _finalConclusion,
+          advisor: _advisor,
+          reference: _documentReference,
+          date: date,
+          companyName: _companyName,
+          siteName: _siteName,
+          validated: !_testValidation,
+        );
     setState(() => _saving = true);
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -649,6 +676,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       if (mounted) {
         setState(() {
           _finalMarkdown = markdown;
+          _documentDate = date;
           _status = 'Analyse finale créée';
         });
       }
@@ -687,7 +715,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   }
 
   void _fillValidationTest() {
+    if (_step != 6) _startValidation();
     setState(() {
+      _testValidation = true;
       RiskAssessmentAssistantService.fillValidationTest(_dangers, _actions);
       if (_advisor.trim().isEmpty) _advisor = 'Service prévention';
       if (_finalConclusion.trim().isEmpty) {
@@ -746,7 +776,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
             onPressed: _saving ? null : _saveToCompanyFolder,
             child: const Text('Sauvegarder dans le dossier société'),
           ),
-        if (_step == 6 && _finalMarkdown == null) ...[
+        if (_draftCreated && _finalMarkdown == null) ...[
           OutlinedButton(
             onPressed: _saving ? null : _fillValidationTest,
             child: const Text('Remplir validation test'),
@@ -798,12 +828,12 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
 
   Future<void> _writeWord({required bool finalDocument}) async {
     final subject = _subject.text.trim();
-    if (subject.isEmpty || (finalDocument && _finalMarkdown == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Créez d’abord le brouillon d’analyse assistée.'),
-        ),
-      );
+    if (finalDocument && _finalMarkdown == null) {
+      _message('Créez d’abord l’analyse finale.');
+      return;
+    }
+    if (subject.isEmpty) {
+      _message('Veuillez préciser un sujet.');
       return;
     }
     final markdown = finalDocument
@@ -816,7 +846,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
             conclusions: _conclusions,
             decisions: _decisions,
           );
-    final now = DateTime.now();
+    final now = _documentDate ?? DateTime.now();
     final document = PreventiaCompanyDocument(
       id: 'assistant-export',
       documentType: 'Analyse assistée de risques',
@@ -826,31 +856,33 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       autoCreated: false,
       source: 'assistant_local',
       markdown: markdown,
-      reference: '',
-      companyName: '',
+      reference: _documentReference,
+      companyName: _companyName,
+      siteName: _siteName,
       formData: {'subject': subject},
     );
     final bytes = DocxExportService.buildAssistedRiskAssessmentDocx(document);
-    String slug(String value) => value
-        .toLowerCase()
-        .replaceAll(
-          RegExp(r'[^a-z0-9àâçéèêëîïôöùûüÿœ]+', caseSensitive: false),
-          '_',
-        )
-        .replaceAll(RegExp(r'^_+|_+$'), '');
-    final name =
-        'analyse_assistee_${finalDocument ? 'finale' : 'brouillon'}_${slug(subject)}_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.docx';
-    await FileExportService.saveDocxBytes(
+    final name = DocxExportService.assistedRiskFileName(document);
+    final saved = await FileExportService.saveDocxBytes(
       bytes: bytes,
       suggestedFileName: name,
       context: context,
-      successMessage: 'Document Word généré.',
+      successMessage: finalDocument
+          ? 'Analyse finale exportée en Word.'
+          : 'Brouillon exporté en Word.',
       errorMessage: 'Export Word impossible',
       onError: (error) {
         if (mounted) _message('Export Word impossible : $error');
       },
-      showResultMessage: true,
+      showResultMessage: false,
     );
+    if (mounted && saved?.wordPath?.isNotEmpty == true) {
+      _message(
+        finalDocument
+            ? 'Analyse finale exportée en Word.'
+            : 'Brouillon exporté en Word.',
+      );
+    }
   }
 
   Future<void> _createDraft() async {
@@ -873,6 +905,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       if (mounted) {
         setState(() {
           _draftCreated = true;
+          _documentDate = DateTime.now();
+          _documentReference =
+              'AA-${_documentDate!.year}-${_documentDate!.microsecondsSinceEpoch}';
           _finalMarkdown = null;
           _status = 'Brouillon';
           _actions = RiskAssessmentAssistantService.actionsFor(
@@ -917,6 +952,10 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         markdown: markdown,
         status: _status,
         actions: _actions,
+        companyName: _companyName.trim().isEmpty ? null : _companyName,
+        siteName: _siteName,
+        reference: _documentReference,
+        createdAt: _documentDate,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -953,7 +992,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       title: Text(
         _finalMarkdown == null
             ? 'Brouillon Markdown enregistré localement'
-            : 'Analyse finale validée',
+            : (_testValidation
+                  ? 'Analyse finale à valider'
+                  : 'Analyse finale validée'),
       ),
       content: SizedBox(
         width: 700,

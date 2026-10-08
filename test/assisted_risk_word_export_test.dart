@@ -35,7 +35,7 @@ void main() {
     expect(DocxExportService.isAssistedRiskDraft(document), isTrue);
     expect(
       DocxExportService.assistedRiskFileName(document),
-      'analyse_assistee_spge_ergonomie_poste_ecran_20261004.docx',
+      'analyse_assistee_brouillon_ergonomie_poste_ecran_20261004.docx',
     );
   });
   test('Word preserves draft content, metadata and validation', () {

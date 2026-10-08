@@ -360,13 +360,16 @@ class PreventiaCompanyProjectService {
     List<AssistantAction> actions = const [],
     String? companyName,
     String? siteName,
+    String? reference,
+    DateTime? createdAt,
   }) async {
     final project = await _getOrCreateCompanyProject(
       companyName ?? 'Société à compléter',
     );
-    final now = DateTime.now();
-    final reference =
-        'AA-${now.year}-${_uuid.v4().substring(0, 4).toUpperCase()}';
+    final now = createdAt ?? DateTime.now();
+    final resolvedReference = reference?.trim().isNotEmpty == true
+        ? reference!.trim()
+        : 'AA-${now.year}-${_uuid.v4().substring(0, 4).toUpperCase()}';
     final document = PreventiaCompanyDocument(
       id: _uuid.v4(),
       documentType: 'Analyse assistée de risques',
@@ -378,7 +381,7 @@ class PreventiaCompanyProjectService {
       source: 'assistant_local',
       isAssistedDraft: status != 'Analyse finale créée',
       markdown: markdown,
-      reference: reference,
+      reference: resolvedReference,
       companyName: project.companyName,
       siteName: siteName?.trim() ?? '',
       formData: {

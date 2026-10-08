@@ -44,15 +44,40 @@ class DocxExportService {
     }
 
     final date = document.createdAt;
-    return 'analyse_assistee_${slug(document.companyName)}_${slug(document.formData['subject']?.toString() ?? 'sujet')}_${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.docx';
+    final prefix = document.status == 'Analyse finale créée'
+        ? 'analyse_finale_assistee'
+        : 'analyse_assistee_brouillon';
+    final subject = slug(document.formData['subject']?.toString() ?? 'sujet');
+    return '${prefix}_${subject.isEmpty ? 'sujet' : subject}_${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.docx';
   }
 
   static String assistedRiskExportMarkdown(PreventiaCompanyDocument document) {
     final body = sanitizeAssistedRiskMarkdownForExport(document.markdown);
     if (document.status == 'Analyse finale créée') {
-      return sanitizeAssistedRiskMarkdownForExport(
-        'Référence : ${document.reference}\nDate : ${_formatDate(document.createdAt)}\nEntreprise : ${document.companyName}\nStatut : Analyse finale créée\n\n$body',
-      );
+      var finalBody = body;
+      // Company-folder metadata is authoritative; retain the advisor's final content.
+      final metadata = {
+        'Référence': document.reference,
+        'Date': _formatDate(document.createdAt),
+        'Entreprise': document.companyName,
+        'Site': document.siteName,
+        'Sujet analysé': document.formData['subject']?.toString() ?? '',
+      };
+      for (final entry in metadata.entries) {
+        final value = entry.value.trim().isEmpty
+            ? 'À compléter'
+            : entry.value.trim();
+        final pattern = RegExp('^${entry.key} :.*\$', multiLine: true);
+        if (pattern.hasMatch(finalBody)) {
+          finalBody = finalBody.replaceFirst(pattern, '${entry.key} : $value');
+        } else {
+          finalBody = finalBody.replaceFirst(
+            '\n',
+            '\n\n${entry.key} : $value\n',
+          );
+        }
+      }
+      return sanitizeAssistedRiskMarkdownForExport(finalBody);
     }
     return sanitizeAssistedRiskMarkdownForExport(
       '# Analyse assistée de risques\n\n'
@@ -1458,43 +1483,5 @@ const _appXml = '''
 </Properties>
 ''';
 
-String sanitizeAssistedRiskMarkdownForExport(String markdown) {
-  var text = markdown
-      .replaceAll('\r\n', '\n')
-      .replaceAll('a_verifier', 'À vérifier');
-  text = text.replaceAll(
-    RegExp(
-      r'```(?:debug|json|log|logs)[^\n]*\n[\s\S]*?```',
-      caseSensitive: false,
-    ),
-    '',
-  );
-  text = text.replaceAll(RegExp(r'<!--[\s\S]*?-->', multiLine: true), '');
-  text = text
-      .split('\n')
-      .where(
-        (line) => !RegExp(
-          r'Intégration PIU|Page\s+1\s*/\s*1|SC[ÉE]NARIO TEST SPGE|Document\s*:\s*Analyse de risques|^\s*(?:\[DEBUG\]|DEBUG\s*:)',
-          caseSensitive: false,
-        ).hasMatch(line),
-      )
-      .join('\n');
-  final lines = text.split('\n');
-  for (var i = lines.length - 1; i >= 0; i--) {
-    final heading = RegExp(r'^(#{1,6})\s').firstMatch(lines[i].trim());
-    if (heading == null || i == 0) continue;
-    var next = i + 1;
-    while (next < lines.length && lines[next].trim().isEmpty) {
-      next++;
-    }
-    final nextHeading = next < lines.length
-        ? RegExp(r'^(#{1,6})\s').firstMatch(lines[next].trim())
-        : null;
-    final level = heading.group(1)!.length;
-    final nextLevel = nextHeading?.group(1)?.length;
-    if (next == lines.length || (nextLevel != null && nextLevel <= level)) {
-      lines.removeAt(i);
-    }
-  }
-  return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
-}
+String sanitizeAssistedRiskMarkdownForExport(String markdown) =>
+    RiskAssessmentAssistantService.cleanMarkdownForExport(markdown);

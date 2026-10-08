@@ -306,7 +306,142 @@ class RiskAssessmentAssistantService {
       q.evidenceExpected = item.$3;
       q.photoRequired = item.$4;
       q.importance = item.$5;
-      q.status = 'vérifié';
+      q.status = 'test — à vérifier sur site';
+    }
+  }
+
+  static const ergonomicsActions = [
+    'Adapter la hauteur des écrans.',
+    'Vérifier le réglage des chaises.',
+    'Corriger les reflets et mesurer l’éclairage.',
+    'Sécuriser les câbles au poste accueil ou autour des postes.',
+    'Fournir supports écran, clavier et souris adaptés.',
+    'Vérifier les postes en télétravail.',
+    'Organiser des pauses ou alternances de tâches.',
+    'Former le personnel aux réglages du poste écran.',
+    'Collecter les plaintes ou inconforts liés au dos, à la nuque, aux épaules ou aux poignets.',
+    'Évaluer la gêne sonore en open space.',
+    'Organiser la manutention ponctuelle du courrier et des colis.',
+  ];
+
+  static const _ergonomicsMeasures = {
+    'Posture assise prolongée':
+        'Organiser des pauses ou alternances de tâches.',
+    'Hauteur écran inadaptée': 'Adapter la hauteur des écrans.',
+    'Chaise mal réglée': 'Vérifier le réglage des chaises.',
+    'Reflets ou éclairage inadapté':
+        'Corriger les reflets et mesurer l’éclairage.',
+    'Câbles au sol ou encombrement':
+        'Sécuriser les câbles au poste accueil ou autour des postes.',
+    'Télétravail partiel non vérifié': 'Vérifier les postes en télétravail.',
+    'Charge mentale et interruptions': 'Évaluer la gêne sonore en open space.',
+    'Manutention ponctuelle de dossiers ou colis':
+        'Organiser la manutention ponctuelle du courrier et des colis.',
+  };
+
+  static void fillErgonomicsDangersTest(List<AssistantDanger> dangers) {
+    const data = [
+      (
+        'Posture assise prolongée',
+        'Travail prolongé en position assise sans alternance suffisante, pouvant entraîner fatigue, douleurs dorsales et inconfort.',
+        'Personnel administratif travaillant sur écran.',
+        'Pauses informelles uniquement, sans organisation structurée.',
+        'Observation du poste et échange avec les travailleurs.',
+        'Vue générale du poste.',
+        3,
+        3,
+        4,
+      ),
+      (
+        'Hauteur écran inadaptée',
+        'Écran placé trop bas ou trop haut, entraînant flexion ou extension prolongée de la nuque.',
+        'Personnel utilisant un écran plusieurs heures par jour.',
+        'Aucun réglage systématique vérifié.',
+        'Photo du poste et observation de la hauteur écran.',
+        'Photo écran / position de travail.',
+        3,
+        3,
+        4,
+      ),
+      (
+        'Chaise mal réglée',
+        'Chaise réglable mais non adaptée au travailleur, pouvant provoquer douleurs dos, épaules ou jambes.',
+        'Personnel administratif et agents d’accueil.',
+        'Chaises réglables disponibles mais réglage individuel non contrôlé.',
+        'Photo de la chaise et observation du réglage.',
+        'Photo chaise / position assise.',
+        3,
+        3,
+        4,
+      ),
+      (
+        'Reflets ou éclairage inadapté',
+        'Reflets sur écran ou éclairage inadapté provoquant fatigue visuelle et postures compensatoires.',
+        'Travailleurs proches des fenêtres ou zones très éclairées.',
+        'Stores ou éclairage général à vérifier.',
+        'Photo montrant les reflets ou l’orientation du poste.',
+        'Photo écran avec reflet ou orientation du poste.',
+        2,
+        3,
+        4,
+      ),
+      (
+        'Câbles au sol ou encombrement',
+        'Câbles visibles ou objets autour du poste créant un risque de trébuchement.',
+        'Travailleurs, visiteurs internes et personnel de nettoyage.',
+        'Rangement des câbles non systématisé.',
+        'Photo des câbles ou zones encombrées.',
+        'Photo câbles / passage.',
+        3,
+        3,
+        3,
+      ),
+      (
+        'Télétravail partiel non vérifié',
+        'Poste à domicile non évalué, avec ordinateur portable utilisé sans support ou périphériques adaptés.',
+        'Travailleurs en télétravail partiel.',
+        'Télétravail autorisé mais poste non vérifié systématiquement.',
+        'Questionnaire télétravail ou déclaration du travailleur.',
+        'Photo du poste télétravail si acceptée par le travailleur, sans données personnelles.',
+        3,
+        3,
+        3,
+      ),
+      (
+        'Charge mentale et interruptions',
+        'Interruptions fréquentes, appels et demandes simultanées pouvant réduire la concentration et augmenter la fatigue.',
+        'Agents administratifs et agents d’accueil.',
+        'Organisation actuelle à vérifier avec la ligne hiérarchique.',
+        'Retour travailleurs, observation ou entretien avec la ligne hiérarchique.',
+        'Non requise.',
+        3,
+        3,
+        3,
+      ),
+      (
+        'Manutention ponctuelle de dossiers ou colis',
+        'Manipulation ponctuelle de dossiers, bacs courrier ou petits colis dans des postures défavorables.',
+        'Agents d’accueil et personnel administratif.',
+        'Aide à la manutention non identifiée.',
+        'Observation des tâches courrier / classement.',
+        'Photo zone courrier ou classement.',
+        2,
+        3,
+        2,
+      ),
+    ];
+    for (final d in dangers) {
+      for (final item in data.where((item) => item.$1 == d.danger)) {
+        d.scenario = item.$2;
+        d.people = item.$3;
+        d.measures = item.$4;
+        d.evidence = item.$5;
+        d.photo = item.$6;
+        d.gravity = item.$7;
+        d.probability = item.$8;
+        d.exposure = item.$9;
+        d.proposedMeasure = _ergonomicsMeasures[d.danger]!;
+      }
     }
   }
 
@@ -360,7 +495,13 @@ class RiskAssessmentAssistantService {
       ],
       _ => ['Danger à préciser sur le terrain'],
     };
-    return dangers.map(AssistantDanger.new).toList();
+    return dangers.map((name) {
+      final danger = AssistantDanger(name);
+      if (_category(subject) == 'ergonomie') {
+        danger.proposedMeasure = _ergonomicsMeasures[name]!;
+      }
+      return danger;
+    }).toList();
   }
 
   static int score(int g, int p, int e) {
@@ -397,50 +538,56 @@ class RiskAssessmentAssistantService {
       'Risques prioritaires': priority.isEmpty
           ? 'À déterminer après observation et cotation complète.'
           : priority.join('\n'),
-      'Actions proposées': [
-        ...questions.where((q) => q.answer == 'non').map((q) {
-          final text = q.text.toLowerCase();
-          if (text.contains('hauteur de l’écran')) {
-            return 'Adapter la hauteur des écrans.';
-          }
-          if (text.contains('chaise')) {
-            return 'Vérifier le réglage des chaises.';
-          }
-          if (text.contains('télétravail')) {
-            return 'Vérifier les postes en télétravail.';
-          }
-          if (text.contains('pauses')) {
-            return 'Organiser des pauses ou alternances de tâches.';
-          }
-          return 'Action proposée : vérifier ou corriger — ${q.text}.';
-        }),
-        if (questions.any(
-          (q) => q.text.contains('chaise') && q.answer == 'non',
-        ))
-          'Former le personnel aux réglages du poste écran.',
-        if (questions.any(
-          (q) => q.text.contains('reflets') && q.answer == 'oui',
-        ))
-          'Corriger les reflets et mesurer l’éclairage.',
-        if (questions.any(
-          (q) => q.text.contains('câbles') && q.answer == 'oui',
-        ))
-          'Sécuriser les câbles au poste accueil ou autour des postes.',
-        if (questions.any(
-          (q) => q.text.contains('ordinateur portable') && q.answer == 'oui',
-        ))
-          'Fournir supports écran, clavier et souris adaptés.',
-        if (questions.any(
-          (q) => q.text.contains('douleurs') && q.answer == 'oui',
-        ))
-          'Collecter les plaintes ou inconforts liés au dos, à la nuque, aux épaules ou aux poignets.',
-        if (questions.any((q) => q.text.contains('bruit') && q.answer == 'oui'))
-          'Évaluer la gêne sonore en open space.',
-        ...dangers.map(
-          (d) =>
-              'Vérifier ${d.danger} sur le terrain et définir les mesures adaptées.',
-        ),
-      ].join('\n'),
+      'Actions proposées':
+          (dangers.any((d) => _ergonomicsMeasures.containsKey(d.danger))
+                  ? ergonomicsActions
+                  : [
+                      ...questions.where((q) => q.answer == 'non').map((q) {
+                        final text = q.text.toLowerCase();
+                        if (text.contains('hauteur de l’écran')) {
+                          return 'Adapter la hauteur des écrans.';
+                        }
+                        if (text.contains('chaise')) {
+                          return 'Vérifier le réglage des chaises.';
+                        }
+                        if (text.contains('télétravail')) {
+                          return 'Vérifier les postes en télétravail.';
+                        }
+                        if (text.contains('pauses')) {
+                          return 'Organiser des pauses ou alternances de tâches.';
+                        }
+                        return 'Action proposée : vérifier ou corriger — ${q.text}.';
+                      }),
+                      if (questions.any(
+                        (q) => q.text.contains('chaise') && q.answer == 'non',
+                      ))
+                        'Former le personnel aux réglages du poste écran.',
+                      if (questions.any(
+                        (q) => q.text.contains('reflets') && q.answer == 'oui',
+                      ))
+                        'Corriger les reflets et mesurer l’éclairage.',
+                      if (questions.any(
+                        (q) => q.text.contains('câbles') && q.answer == 'oui',
+                      ))
+                        'Sécuriser les câbles au poste accueil ou autour des postes.',
+                      if (questions.any(
+                        (q) =>
+                            q.text.contains('ordinateur portable') &&
+                            q.answer == 'oui',
+                      ))
+                        'Fournir supports écran, clavier et souris adaptés.',
+                      if (questions.any(
+                        (q) => q.text.contains('douleurs') && q.answer == 'oui',
+                      ))
+                        'Collecter les plaintes ou inconforts liés au dos, à la nuque, aux épaules ou aux poignets.',
+                      if (questions.any(
+                        (q) => q.text.contains('bruit') && q.answer == 'oui',
+                      ))
+                        'Évaluer la gêne sonore en open space.',
+                      ...dangers.map((d) => d.proposedMeasure),
+                    ])
+              .toSet()
+              .join('\n'),
       'Preuves manquantes': dangers
           .map(
             (d) =>
@@ -455,23 +602,50 @@ class RiskAssessmentAssistantService {
   static List<AssistantAction> actionsFor(
     List<AssistantDanger> dangers,
     String proposals,
-  ) => [
-    for (final d in dangers)
-      AssistantAction(
-        d.proposedMeasure,
-        linkedRisk: d.danger,
-        priority: d.level,
-      ),
-    for (final line
-        in proposals
-            .split('\n')
-            .where(
-              (s) =>
-                  s.trim().isNotEmpty &&
-                  !dangers.any((d) => d.proposedMeasure == s.trim()),
-            ))
-      AssistantAction(line.trim(), linkedRisk: 'À préciser par le conseiller'),
-  ];
+  ) {
+    final texts = <String>{
+      ...proposals.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty),
+      ...dangers
+          .map((d) => d.proposedMeasure.trim())
+          .where((s) => s.isNotEmpty),
+    };
+    return texts.map((text) {
+      AssistantDanger? risk;
+      for (final d in dangers) {
+        if (d.proposedMeasure == text) {
+          risk = d;
+          break;
+        }
+      }
+      if (risk == null &&
+          dangers.any((d) => _ergonomicsMeasures.containsKey(d.danger))) {
+        final name = text.contains('plaintes')
+            ? 'Posture assise prolongée'
+            : text.contains('Former') || text.contains('supports écran')
+            ? 'Hauteur écran inadaptée'
+            : '';
+        for (final d in dangers.where((d) => d.danger == name)) {
+          risk = d;
+        }
+      }
+      return AssistantAction(
+        text,
+        linkedRisk: risk?.danger ?? 'À préciser par le conseiller',
+        priority: risk?.level ?? 'À déterminer',
+        type: text.startsWith('Former')
+            ? 'formation'
+            : text.startsWith('Fournir')
+            ? 'achat'
+            : text.startsWith('Collecter')
+            ? 'preuve'
+            : text.startsWith('Adapter') ||
+                  text.startsWith('Corriger') ||
+                  text.startsWith('Sécuriser')
+            ? 'technique'
+            : 'organisationnelle',
+      );
+    }).toList();
+  }
 
   static void fillValidationTest(
     List<AssistantDanger> dangers,
@@ -519,6 +693,9 @@ class RiskAssessmentAssistantService {
     return errors;
   }
 
+  static const finalNotice =
+      'Ce document constitue une analyse assistée préparée à partir des informations encodées. Il doit être vérifié, complété et validé par le conseiller en prévention, l’employeur et les instances compétentes.';
+
   static String finalAnalysis({
     required String subject,
     required Map<String, String> answers,
@@ -527,61 +704,110 @@ class RiskAssessmentAssistantService {
     required List<AssistantAction> actions,
     required String conclusion,
     required String advisor,
+    String reference = '',
+    DateTime? date,
+    String companyName = '',
+    String siteName = '',
+    bool validated = true,
+  }) => buildFinalAssistedRiskMarkdown(
+    subject: subject,
+    answers: answers,
+    questions: questions,
+    dangers: dangers,
+    actions: actions,
+    conclusion: conclusion,
+    advisor: advisor,
+    reference: reference,
+    date: date,
+    companyName: companyName,
+    siteName: siteName,
+    validated: validated,
+  );
+
+  static String buildFinalAssistedRiskMarkdown({
+    required String subject,
+    required Map<String, String> answers,
+    required List<FieldQuestion> questions,
+    required List<AssistantDanger> dangers,
+    required List<AssistantAction> actions,
+    required String conclusion,
+    required String advisor,
+    String reference = '',
+    DateTime? date,
+    String companyName = '',
+    String siteName = '',
+    bool validated = false,
   }) {
     final errors = validationErrors(dangers, actions);
     if (errors.isNotEmpty) throw StateError(errors.join('\n'));
-    final b = StringBuffer(
-      '# Analyse finale assistée de risques\n\nDocument validé par le conseiller en prévention : $advisor.\n\n## Sujet',
-    );
+    String value(String? v) =>
+        v == null || v.trim().isEmpty ? 'À compléter' : v.trim();
+    final dateLabel = date == null
+        ? 'À compléter'
+        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final b = StringBuffer('# Analyse finale assistée de risques\n\n');
     b.writeln(
-      draft(
-            subject: subject,
-            answers: answers,
-            questions: questions,
-            dangers: dangers.where((d) => d.retained).toList(),
-            conclusions: {},
-            decisions: {},
-          )
-          .split('## Sujet')
-          .last
-          .split('## Conclusions provisoires')
-          .first
-          .replaceAll('cotations provisoires', 'cotations finales')
-          .replaceAll(
-            'Échelle expérimentale',
-            'Échelle validée par le conseiller',
-          )
-          .replaceAll('Seuils à valider.', ''),
+      'Référence : ${value(reference)}\nDate : $dateLabel\nEntreprise : ${value(companyName)}\nSite : ${value(siteName)}\nSujet analysé : ${value(subject)}\nStatut : ${validated ? 'Analyse finale validée' : 'Analyse finale à valider'}\n',
     );
-    for (final d in dangers.where((d) => d.retained)) {
+    b.writeln('$finalNotice\n\n$warning\n');
+    b.writeln(
+      validated
+          ? 'Document validé par le conseiller en prévention : ${value(advisor)}.\n'
+          : 'Préparé pour validation par le conseiller en prévention : ${value(advisor)}.\n',
+    );
+    b.writeln('## Questionnaire de base');
+    for (final label in questionnaire) {
+      b.writeln('\n### $label\n${value(answers[label])}');
+    }
+    b.writeln('\n## Questions terrain et réponses');
+    if (questions.isEmpty) b.writeln('Aucune question terrain renseignée.');
+    if (questions.isNotEmpty) {
       b.writeln(
-        '### Décision — ${d.danger}\nStatut : ${d.decision!.label}\nMesure proposée validée : ${d.proposedMeasure}\nCommentaire conseiller : ${d.advisorComment}\nResponsable : ${d.responsible}\nDélai : ${d.deadline}\nPreuve finale attendue : ${d.finalEvidence}\n',
+        '| Question | Réponse | Commentaire | Preuve attendue | Photo | Importance |',
+      );
+      b.writeln('|---|---|---|---|---|---|');
+      for (final q in questions) {
+        String cell(String v) =>
+            value(v).replaceAll('|', r'\|').replaceAll('\n', '<br>');
+        b.writeln(
+          '| ${cell(q.text)} | ${answerLabel(q.answer)} | ${cell(q.comment)} | ${cell(q.evidenceExpected)} | ${q.photoRequired ? 'À prendre' : 'Non requise'} | ${cell(q.importance)} |',
+        );
+      }
+    }
+    b.writeln('\n## Dangers retenus et cotations finales');
+    b.writeln(
+      'G, P, E de 1 à 5 ; score G × P × E. Faible < 20, moyen 20–49, élevé 50–99, critique 100–125. Grille à vérifier pour la situation étudiée.',
+    );
+    final retained = dangers.where((d) => d.retained).toList();
+    if (retained.isEmpty) b.writeln('Aucun danger retenu par le conseiller.');
+    for (final d in retained) {
+      b.writeln(
+        '\n### ${value(d.danger)}\nScénario plausible : ${value(d.scenario)}\nPersonnes exposées : ${value(d.people)}\nMesures existantes : ${value(d.measures)}\nPreuve attendue : ${value(d.evidence)}\nPhoto attendue : ${value(d.photo)}\nCotation finale G/P/E : ${d.gravity}/${d.probability}/${d.exposure}\nScore : ${d.score} ; Niveau : ${d.level}\nStatut conseiller : ${d.decision!.label}\nCommentaire conseiller : ${value(d.advisorComment)}\nResponsable : ${value(d.responsible)}\nDélai : ${value(d.deadline)}\nPreuve finale attendue : ${value(d.finalEvidence)}',
       );
     }
-    void writeAction(AssistantAction a) {
+    b.writeln('\n## Plan d’action retenu');
+    final accepted = actions.where((a) => a.retained).toList();
+    if (accepted.isEmpty) b.writeln('Aucune action retenue par le conseiller.');
+    for (final a in accepted) {
       b.writeln(
-        '### ${a.action}\nRisque lié : ${a.linkedRisk}\nPriorité : ${a.priority}\nType : ${a.type}\nIntégration : ${a.integration}\nStatut conseiller : ${a.decision!.label}\nCommentaire conseiller : ${a.advisorComment}\nResponsable : ${a.responsible}\nDélai : ${a.deadline}\nPreuve attendue : ${a.finalEvidence}\n',
+        '\n### ${a.action}\nRisque lié : ${value(a.linkedRisk)}\nPriorité : ${a.priority}\nType : ${a.type}\nProposition d’intégration : ${a.integration}\nStatut conseiller : ${a.decision!.label}\nResponsable : ${a.responsible}\nDélai : ${a.deadline}\nPreuve attendue : ${a.finalEvidence}\nCommentaire conseiller : ${value(a.advisorComment)}',
       );
     }
-
-    b.writeln('## Actions finales — PAA/PGP');
-    for (final a in actions.where((a) => a.retained)) {
-      writeAction(a);
-    }
-    b.writeln('## Annexe — Actions refusées');
-    for (final a in actions.where(
-      (a) => a.decision == AdvisorDecision.refused,
-    )) {
-      writeAction(a);
+    final refused = actions
+        .where((a) => a.decision == AdvisorDecision.refused)
+        .toList();
+    if (refused.isNotEmpty) {
+      b.writeln('\n## Actions écartées ou refusées');
+      for (final a in refused) {
+        b.writeln(
+          '\n### ${a.action}\nCommentaire conseiller : ${value(a.advisorComment)}',
+        );
+      }
     }
     b.writeln(
-      '## Conclusion finale du conseiller\n$conclusion\n\n## Signatures\nConseiller en prévention : $advisor\nSignature : ____________________\nEmployeur : ____________________\nDate : ____________________',
+      '\n## Conclusion finale du conseiller\n${value(conclusion)}\n\n## Signatures\nConseiller en prévention : ${value(advisor)}\nSignature : ____________________\nEmployeur : ____________________\nDate de validation : ____________________',
     );
-    return b
-        .toString()
-        .replaceAll(RegExp(r'Page\s+1\s*/\s*1', caseSensitive: false), '')
-        .replaceAll('SCÉNARIO TEST SPGE', '')
-        .replaceAll('SCENARIO TEST SPGE', '');
+    return cleanMarkdownForExport(b.toString());
   }
 
   static String draft({
@@ -595,17 +821,19 @@ class RiskAssessmentAssistantService {
     String value(String? text) =>
         text == null || text.trim().isEmpty ? 'À compléter' : text.trim();
     final b = StringBuffer(
-      '# Brouillon d’analyse de risques — à valider\n\n$warning\n\n## Sujet\n${value(subject)}\n\n## Questionnaire\n',
+      '# Brouillon d’analyse de risques — à valider\n\n$warning\n\n## Sujet\n${value(subject)}\n\n## Questionnaire de base\n',
     );
     for (final label in questionnaire) {
       b.writeln('\n### $label\n${value(answers[label])}');
     }
     b.writeln('\n## Questions terrain');
-    b.writeln('| Question | Réponse | Commentaire | Preuve attendue | Photo |');
-    b.writeln('|---|---|---|---|---|');
+    b.writeln(
+      '| Question | Réponse | Commentaire | Preuve attendue | Photo | Importance |',
+    );
+    b.writeln('|---|---|---|---|---|---|');
     for (final q in questions) {
       b.writeln(
-        '| ${q.text} | ${answerLabel(q.answer)} | ${value(q.comment)} | ${value(q.evidenceExpected)} | ${q.photoRequired ? 'À prendre' : 'Non requise'} |',
+        '| ${q.text} | ${answerLabel(q.answer)} | ${value(q.comment)} | ${value(q.evidenceExpected)} | ${q.photoRequired ? 'À prendre' : 'Non requise'} | ${q.importance} |',
       );
     }
     final photos = questions
@@ -633,10 +861,47 @@ class RiskAssessmentAssistantService {
     b.writeln(
       '\n## Validation\nBrouillon non validé. Observation terrain, compléments et validation requis avant utilisation. Les choix PAA/PGP sont des intentions à valider, sans intégration automatique.',
     );
-    return b
-        .toString()
-        .replaceAll(RegExp(r'Page\s+1\s*/\s*1', caseSensitive: false), '')
-        .replaceAll('SCÉNARIO TEST SPGE', '')
-        .replaceAll('SCENARIO TEST SPGE', '');
+    return cleanMarkdownForExport(b.toString());
+  }
+
+  static String cleanMarkdownForExport(String markdown) {
+    var text = markdown
+        .replaceAll('\r\n', '\n')
+        .replaceAll('a_verifier', 'À vérifier');
+    text = text.replaceAll(
+      RegExp(
+        r'```(?:debug|json|log|logs)[^\n]*\n[\s\S]*?```',
+        caseSensitive: false,
+      ),
+      '',
+    );
+    text = text.replaceAll(RegExp(r'<!--[\s\S]*?-->', multiLine: true), '');
+    text = text
+        .split('\n')
+        .where(
+          (line) => !RegExp(
+            r'Intégration PIU|Page\s+1\s*/\s*1|SC[ÉE]NARIO TEST SPGE|Document\s*:\s*Analyse de risques|^\s*(?:\[DEBUG\]|DEBUG\s*:)',
+            caseSensitive: false,
+          ).hasMatch(line),
+        )
+        .join('\n');
+    final lines = text.split('\n');
+    for (var i = lines.length - 1; i >= 0; i--) {
+      final heading = RegExp(r'^(#{1,6})\s').firstMatch(lines[i].trim());
+      if (heading == null || i == 0) continue;
+      var next = i + 1;
+      while (next < lines.length && lines[next].trim().isEmpty) {
+        next++;
+      }
+      final nextHeading = next < lines.length
+          ? RegExp(r'^(#{1,6})\s').firstMatch(lines[next].trim())
+          : null;
+      final level = heading.group(1)!.length;
+      final nextLevel = nextHeading?.group(1)?.length;
+      if (next == lines.length || (nextLevel != null && nextLevel <= level)) {
+        lines.removeAt(i);
+      }
+    }
+    return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
   }
 }

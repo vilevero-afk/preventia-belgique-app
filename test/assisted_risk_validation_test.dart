@@ -57,8 +57,9 @@ void main() {
   test('actions retenues présentes et refusées uniquement en annexe', () {
     final refused = AssistantAction('Acheter du matériel')
       ..decision = AdvisorDecision.refused;
+    danger.proposedMeasure = refused.action;
     final text = finalText([action, refused]);
-    final sections = text.split('## Annexe — Actions refusées');
+    final sections = text.split('## Actions écartées ou refusées');
     expect(sections.first, contains('Balisage'));
     expect(sections.first, contains('Conseiller'));
     expect(sections.first, contains('30 jours'));
@@ -98,6 +99,110 @@ void main() {
       expect(imported.single['title'], 'Balisage');
       expect(imported.single['responsible'], 'Conseiller');
       expect(imported.single['risk'], 'Chute');
+    },
+  );
+
+  test('nom du Word final sans accents ni caractères de chemin', () {
+    final doc = PreventiaCompanyDocument(
+      id: 'final',
+      documentType: 'Analyse assistée de risques',
+      title: 'Analyse finale',
+      status: 'Analyse finale créée',
+      createdAt: DateTime(2026, 10, 8),
+      autoCreated: false,
+      source: 'assistant_local',
+      reference: 'AA-2026-001',
+      companyName: 'SPGE',
+      siteName: 'Verviers',
+      markdown: finalText([action]),
+      formData: const {'subject': 'Ergonomie poste écran'},
+    );
+    expect(
+      DocxExportService.assistedRiskFileName(doc),
+      'analyse_finale_assistee_ergonomie_poste_ecran_20261008.docx',
+    );
+    final text = DocxExportService.assistedRiskExportMarkdown(doc);
+    expect(text, contains('Référence : AA-2026-001'));
+    expect(text, contains('Entreprise : SPGE'));
+    expect(text, contains('Site : Verviers'));
+    expect(text, contains('Sujet analysé : Ergonomie poste écran'));
+    expect(text, isNot(contains('Brouillon')));
+  });
+
+  test(
+    'sauvegarder un brouillon dans le dossier existant préserve les documents antérieurs',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = PreventiaCompanyProjectService(
+        preferences: await SharedPreferences.getInstance(),
+      );
+      final date = DateTime(2026, 10, 8);
+      final initial = await service.saveAssistedDraft(
+        subject: 'Analyse précédente',
+        companyName: 'SPGE',
+        markdown: '# Analyse précédente',
+      );
+      PreventiaCompanyDocument existing(
+        String id,
+        String type,
+        String markdown,
+      ) => PreventiaCompanyDocument(
+        id: id,
+        documentType: type,
+        title: type,
+        status: 'généré',
+        createdAt: date,
+        autoCreated: false,
+        source: 'backend',
+        reference: id,
+        companyName: 'SPGE',
+        markdown: markdown,
+        formData: const {},
+      );
+      final backend = existing(
+        'backend-original',
+        'Analyse de risques générale',
+        '# Analyse backend originale',
+      );
+      final piu = existing(
+        'piu-original',
+        'Plan Interne d’Urgence',
+        '# PIU original',
+      );
+      final pga = existing('pga-original', 'PGA/PAA/PGP', '# PGA original');
+      await service.saveProject(
+        initial.copyWith(
+          analyses: [backend],
+          documents: [backend, piu, pga],
+          piuDocument: piu,
+          pgaDocument: pga,
+        ),
+      );
+      final updated = await service.saveAssistedDraft(
+        subject: 'Ergonomie poste écran',
+        companyName: 'SPGE',
+        siteName: 'Verviers',
+        reference: 'AA-2026-NEW',
+        createdAt: date,
+        markdown: '# Nouveau brouillon assisté',
+      );
+      expect(
+        updated.analyses.firstWhere((d) => d.id == backend.id).markdown,
+        backend.markdown,
+      );
+      expect(
+        updated.documents.map((d) => d.id),
+        containsAll([backend.id, piu.id, pga.id]),
+      );
+      expect(updated.piuDocument!.markdown, piu.markdown);
+      expect(updated.pgaDocument!.markdown, pga.markdown);
+      final saved = updated.analyses.firstWhere(
+        (d) => d.reference == 'AA-2026-NEW',
+      );
+      expect(saved.companyName, 'SPGE');
+      expect(saved.siteName, 'Verviers');
+      expect(saved.createdAt, date);
+      expect(saved.isAssistedDraft, isTrue);
     },
   );
 

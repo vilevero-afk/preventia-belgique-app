@@ -95,6 +95,135 @@ void main() {
     },
   );
 
+  testWidgets(
+    'scénario ergonomie visible puis Word final prêt sans validation implicite',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: RiskAssessmentAssistantScreen()),
+      );
+      Future<void> enter(String label, String value) async {
+        final field = find.byWidgetPredicate(
+          (w) => w is TextField && w.decoration?.labelText == label,
+        );
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
+        await tester.enterText(field, value);
+        await tester.pumpAndSettle();
+      }
+
+      await enter('Quel sujet voulez-vous analyser ?', 'Ergonomie poste écran');
+      await enter('Entreprise', 'SPGE');
+      await enter('Site', 'Verviers');
+      await tester.tap(find.text('Suivant'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Remplir automatiquement — test ergonomie rien n’est fait'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Questionnaire de base et scénario ergonomie remplis.'),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is TextFormField &&
+              (w.initialValue ?? '').startsWith(
+                'Postes administratifs sur écran du site administratif de Verviers',
+              ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is TextFormField &&
+              (w.initialValue ?? '').startsWith(
+                'Personnel administratif, agents d’accueil',
+              ),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Suivant'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is DropdownButtonFormField<String> && w.initialValue == 'non',
+        ),
+        findsNWidgets(5),
+      );
+      expect(find.text('Photo : À prendre'), findsNWidgets(6));
+      expect(find.text('a_verifier'), findsNothing);
+      await tester.tap(find.text('Suivant'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is TextFormField &&
+              (w.initialValue ?? '').contains(
+                'flexion ou extension prolongée de la nuque',
+              ),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Suivant'));
+      await tester.pumpAndSettle();
+      expect(find.text('Score : 36 — Niveau : moyen'), findsNWidgets(3));
+      await tester.tap(find.text('Suivant'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Créer un brouillon d’analyse'));
+      await tester.pumpAndSettle();
+      for (final label in [
+        'Exporter Word — brouillon',
+        'Sauvegarder dans le dossier société',
+        'Remplir validation test',
+        'Créer l’analyse finale',
+      ]) {
+        expect(find.text(label).hitTestable(), findsOneWidget);
+      }
+      await tester.tap(find.text('Remplir validation test'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Créer l’analyse finale'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Exporter Word — analyse finale').hitTestable(),
+        findsOneWidget,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      final text = prefs.getString(
+        'risk_assessment_assistant_latest_final_markdown',
+      )!;
+      expect(text, contains('Entreprise : SPGE'));
+      expect(text, contains('Site : Verviers'));
+      expect(text, contains('Statut : Analyse finale à valider'));
+      expect(text, contains('Cotation finale G/P/E : 3/3/4'));
+      expect(text, contains('Plan d’action retenu'));
+      expect(text, contains('Adapter la hauteur des écrans.'));
+      expect(text, isNot(contains('Document validé par le conseiller')));
+    },
+  );
+
+  testWidgets(
+    'les quatre boutons du brouillon restent accessibles sur écran étroit',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await createDraft(tester);
+      for (final label in [
+        'Exporter Word — brouillon',
+        'Sauvegarder dans le dossier société',
+        'Remplir validation test',
+        'Créer l’analyse finale',
+      ]) {
+        expect(find.text(label).hitTestable(), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('action acceptée incomplète explique le blocage', (tester) async {
     await createDraft(tester);
     await tester.tap(find.text('Passer à la validation'));
