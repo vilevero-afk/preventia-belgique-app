@@ -65,6 +65,26 @@ class LicenseStatus {
     final rawStatus =
         json['licenseStatus'] ?? json['license'] ?? json['status'] ?? json;
     final source = rawStatus is Map<String, dynamic> ? rawStatus : json;
+    final endDate = _dateValue(
+      source['endDate'] ?? source['expiresAt'] ?? source['expirationDate'],
+    );
+    final explicitActive = source['isActive'] ?? source['active'];
+    final canAccess = source['canAccess'] ?? json['canAccess'];
+    final canGenerate = source['canGenerate'] ?? json['canGenerate'];
+    final simpleQuota = _intValue(
+      source['monthlySimpleDocumentsLimit'] ?? source['simpleDocumentsLimit'],
+    );
+    final riskQuota = _intValue(
+      source['monthlyRiskAnalysisLimit'] ?? source['riskAnalysisLimit'],
+    );
+    // Some API responses expose access permissions instead of an active flag.
+    // An explicit inactive flag and an expired date always remain blocking.
+    final active = explicitActive != null
+        ? _boolValue(explicitActive)
+        : endDate != null &&
+              endDate.isAfter(DateTime.now()) &&
+              (_boolValue(canAccess) || _boolValue(canGenerate)) &&
+              ((simpleQuota ?? 0) > 0 || (riskQuota ?? 0) > 0);
     return LicenseStatus(
       plan: _stringValue(source['plan']),
       companyName: _stringValue(source['companyName'] ?? source['company']),
@@ -105,7 +125,8 @@ class LicenseStatus {
           ) ??
           0,
       allowedFeatures: _stringList(source['allowedFeatures']),
-      isActive: _boolValue(source['isActive'] ?? source['active']),
+      isActive:
+          active && (endDate == null || !endDate.isBefore(DateTime.now())),
     );
   }
 
@@ -163,7 +184,18 @@ class LicenseStatus {
     if (value is! String || value.trim().isEmpty) {
       return null;
     }
-    return DateTime.tryParse(value.trim());
+    final raw = value.trim();
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null) return parsed;
+    final match = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(raw);
+    if (match == null) return null;
+    final day = int.parse(match.group(1)!);
+    final month = int.parse(match.group(2)!);
+    final year = int.parse(match.group(3)!);
+    final date = DateTime(year, month, day, 23, 59, 59);
+    return date.day == day && date.month == month && date.year == year
+        ? date
+        : null;
   }
 
   static List<String> _stringList(Object? value) {

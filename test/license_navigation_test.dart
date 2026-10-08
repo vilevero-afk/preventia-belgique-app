@@ -5,6 +5,7 @@ import 'package:preventia_belgique_app/main.dart';
 import 'package:preventia_belgique_app/models/license_status.dart';
 import 'package:preventia_belgique_app/screens/home_screen.dart';
 import 'package:preventia_belgique_app/screens/license_screen.dart';
+import 'package:preventia_belgique_app/screens/login_screen.dart';
 import 'package:preventia_belgique_app/services/app_config_service.dart';
 import 'package:preventia_belgique_app/services/app_locale_controller.dart';
 import 'package:preventia_belgique_app/services/license_service.dart';
@@ -92,7 +93,7 @@ void main() {
   Future<void> login(WidgetTester tester) async {
     await tester.enterText(find.byType(TextField).first, 'user@example.com');
     await tester.enterText(find.byType(TextField).last, 'test-password');
-    await tester.tap(find.text('Se connecter'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Se connecter'));
     await tester.pumpAndSettle();
   }
 
@@ -102,6 +103,87 @@ void main() {
     await tester.tap(find.text(item));
     await tester.pumpAndSettle();
   }
+
+  test(
+    'permissions ne réactivent pas une licence expirée ou explicitement inactive',
+    () {
+      for (final fields in [
+        {'endDate': '31/12/2020'},
+        {'endDate': '31/12/2099', 'isActive': false},
+      ]) {
+        final value = LicenseStatus.fromJson({
+          'license': {
+            ...fields,
+            'canAccess': true,
+            'monthlySimpleDocumentsLimit': 50,
+          },
+        });
+        expect(value.isActive, isFalse);
+      }
+    },
+  );
+
+  testWidgets(
+    'écran ouvert depuis menu conserve le retour même si statut inactif',
+    (tester) async {
+      final service = _LicenseService(status(), token: 'test');
+      await openApp(tester, service);
+      service.nextStatus = status(active: false);
+      await chooseMenu(tester, 'Abonnement / Licence');
+      expect(find.text('Licence inactive'), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
+    },
+  );
+
+  testWidgets('sans session le démarrage affiche uniquement la connexion', (
+    tester,
+  ) async {
+    await openApp(tester, _LicenseService(status()));
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(LicenseScreen), findsNothing);
+    expect(find.text('Abonnement / Licence'), findsNothing);
+  });
+
+  for (final permission in ['canAccess', 'canGenerate']) {
+    testWidgets(
+      'licence au 31/12/2099 avec $permission ouvre l’accueil et affiche Licence active',
+      (tester) async {
+        final valid = LicenseStatus.fromJson({
+          'email': 'user@example.com',
+          permission: true,
+          'license': {
+            'endDate': '31/12/2099',
+            'monthlySimpleDocumentsLimit': 50,
+            'monthlyRiskAnalysisLimit': 10,
+          },
+        });
+        expect(valid.isActive, isTrue);
+        expect(valid.endDate!.year, 2099);
+        await openApp(tester, _LicenseService(valid));
+        await login(tester);
+        expect(find.byType(HomeScreen), findsOneWidget);
+        expect(find.byType(LicenseScreen), findsNothing);
+        await chooseMenu(tester, 'Abonnement / Licence');
+        expect(find.text('Licence active'), findsOneWidget);
+        expect(find.text('Licence inactive'), findsNothing);
+      },
+    );
+  }
+
+  testWidgets('licence absente avec session affiche le blocage', (
+    tester,
+  ) async {
+    await openApp(
+      tester,
+      _LicenseService(LicenseStatus.inactive(), token: 'test'),
+    );
+    expect(find.byType(LicenseScreen), findsOneWidget);
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(HomeScreen), findsNothing);
+  });
 
   testWidgets(
     'connexion active ouvre directement l’accueil sans écran licence',
@@ -230,9 +312,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(service.logoutCalls, 1);
       expect(find.byType(HomeScreen), findsNothing);
-      expect(find.text('Se connecter'), findsOneWidget);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(LicenseScreen), findsNothing);
       expect(
-        Navigator.of(tester.element(find.byType(LicenseScreen))).canPop(),
+        Navigator.of(tester.element(find.byType(LoginScreen))).canPop(),
         isFalse,
       );
     },

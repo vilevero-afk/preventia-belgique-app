@@ -8,7 +8,7 @@ import '../services/billing_service.dart';
 import '../services/license_service.dart';
 import '../widgets/adaptive_page.dart';
 import 'home_screen.dart';
-import 'register_license_screen.dart';
+import 'login_screen.dart';
 
 enum LicenseMenuAction { refresh, manageSubscription, logout }
 
@@ -31,17 +31,13 @@ class LicenseScreen extends StatefulWidget {
 }
 
 class _LicenseScreenState extends State<LicenseScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   late final LicenseService _service;
   late final _billingService = BillingService(licenseService: _service);
 
-  bool _isLoggedIn = false;
   LicenseStatus? _licenseStatus;
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _rememberMe = false;
-  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -50,17 +46,9 @@ class _LicenseScreenState extends State<LicenseScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     try {
       final rememberMe = await _service.getRememberMe();
-      final email = rememberMe ? await _service.getSavedEmail() : null;
       final token = await _service.getAuthToken();
       final status = token == null
           ? null
@@ -68,7 +56,6 @@ class _LicenseScreenState extends State<LicenseScreen> {
               forceRefresh: widget.initialAction != LicenseMenuAction.refresh,
             );
       final tokenAfterCheck = await _service.getAuthToken();
-      final sessionExpired = token != null && tokenAfterCheck == null;
       if (!mounted) {
         return;
       }
@@ -76,13 +63,15 @@ class _LicenseScreenState extends State<LicenseScreen> {
         'LicenseScreen loaded active session ${status == null ? 'no' : 'yes'}',
       );
       setState(() {
-        _emailController.text = email ?? status?.email ?? '';
         _rememberMe = rememberMe;
-        _isLoggedIn = status != null && tokenAfterCheck != null;
         _licenseStatus = status;
         _isLoading = false;
       });
-      if (_handleStatus(status)) return;
+      if (tokenAfterCheck == null) {
+        _openLoginScreen();
+        return;
+      }
+      if (!widget.managementOnly && _handleStatus(status)) return;
       switch (widget.initialAction) {
         case LicenseMenuAction.refresh:
           await _refresh();
@@ -94,79 +83,24 @@ class _LicenseScreenState extends State<LicenseScreen> {
           break;
       }
       if (!mounted) return;
-      if (sessionExpired) {
-        _showSnackBar(l10n(context).sessionExpired, isError: true);
-      }
     } on LicenseException catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _isLoggedIn = false;
         _licenseStatus = null;
         _isLoading = false;
       });
-      if (_handleStatus(null)) return;
       _showSnackBar(error.message, isError: true);
     } on Object catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _isLoggedIn = false;
         _licenseStatus = null;
         _isLoading = false;
       });
-      if (_handleStatus(null)) return;
       _showSnackBar(error.toString(), isError: true);
-    }
-  }
-
-  Future<void> _login() async {
-    setState(() => _isSubmitting = true);
-    try {
-      final status = await _service.login(
-        _emailController.text,
-        _passwordController.text,
-        _rememberMe,
-      );
-      if (!mounted) {
-        return;
-      }
-      debugPrint('switching UI to logged in');
-      setState(() {
-        _isLoggedIn = true;
-        _licenseStatus = status;
-        _isLoading = false;
-        _isSubmitting = false;
-        _emailController.text = status.email.isEmpty
-            ? _emailController.text.trim()
-            : status.email;
-        _passwordController.clear();
-        _obscurePassword = true;
-      });
-      if (!_handleStatus(status)) {
-        _showSnackBar(
-          status.isExpired
-              ? l10n(context).expiredLicense
-              : l10n(context).loginSuccessful,
-          isError: !status.isActive || status.isExpired,
-        );
-      }
-    } on LicenseException catch (error) {
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar(error.message, isError: true);
-    } on Object catch (error) {
-      if (!mounted) {
-        return;
-      }
-      _showSnackBar(error.toString(), isError: true);
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
     }
   }
 
@@ -178,10 +112,13 @@ class _LicenseScreenState extends State<LicenseScreen> {
         return;
       }
       setState(() {
-        _isLoggedIn = status != null;
         _licenseStatus = status;
       });
-      _handleStatus(status);
+      if (await _service.getAuthToken() == null) {
+        if (mounted) _openLoginScreen();
+        return;
+      }
+      if (mounted) _handleStatus(status);
     } on LicenseException catch (error) {
       if (!mounted) {
         return;
@@ -271,6 +208,15 @@ class _LicenseScreenState extends State<LicenseScreen> {
     return false;
   }
 
+  void _openLoginScreen() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => LoginScreen(licenseService: _service),
+      ),
+      (route) => false,
+    );
+  }
+
   void _openBlockingScreen() {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
@@ -298,16 +244,11 @@ class _LicenseScreenState extends State<LicenseScreen> {
     setState(() => _isSubmitting = true);
     try {
       await _service.logoutThisDevice(localOnly: localOnly);
-      final savedEmail = await _service.getSavedEmail();
       if (!mounted) {
         return;
       }
       setState(() {
-        _isLoggedIn = false;
         _licenseStatus = null;
-        _emailController.text = savedEmail ?? '';
-        _passwordController.clear();
-        _obscurePassword = true;
       });
       _showSnackBar(l10n(context).deviceLoggedOut, isError: false);
     } on LicenseException catch (error) {
@@ -315,16 +256,11 @@ class _LicenseScreenState extends State<LicenseScreen> {
         return;
       }
       await _service.clearSession(keepRememberedEmail: _rememberMe);
-      final savedEmail = await _service.getSavedEmail();
       if (!mounted) {
         return;
       }
       setState(() {
-        _isLoggedIn = false;
         _licenseStatus = null;
-        _emailController.text = savedEmail ?? '';
-        _passwordController.clear();
-        _obscurePassword = true;
       });
       _showSnackBar(error.message, isError: true);
     } on Object catch (error) {
@@ -332,22 +268,17 @@ class _LicenseScreenState extends State<LicenseScreen> {
         return;
       }
       await _service.clearSession(keepRememberedEmail: _rememberMe);
-      final savedEmail = await _service.getSavedEmail();
       if (!mounted) {
         return;
       }
       setState(() {
-        _isLoggedIn = false;
         _licenseStatus = null;
-        _emailController.text = savedEmail ?? '';
-        _passwordController.clear();
-        _obscurePassword = true;
       });
       _showSnackBar(error.toString(), isError: true);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        if (widget.managementOnly) _openBlockingScreen();
+        _openLoginScreen();
       }
     }
   }
@@ -373,36 +304,13 @@ class _LicenseScreenState extends State<LicenseScreen> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  if (!_isLoggedIn || status == null)
-                    _LoginPanel(
-                      emailController: _emailController,
-                      passwordController: _passwordController,
-                      isSubmitting: _isSubmitting,
-                      rememberMe: _rememberMe,
-                      obscurePassword: _obscurePassword,
-                      onRememberMeChanged: (value) {
-                        setState(() => _rememberMe = value);
-                      },
-                      onTogglePasswordVisibility: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                      onLogin: _login,
-                      onCreateLicense: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const RegisterLicenseScreen(),
-                          ),
-                        );
-                      },
-                    )
-                  else
-                    _StatusPanel(
-                      status: status,
-                      isSubmitting: _isSubmitting,
-                      onRefresh: _refresh,
-                      onManageSubscription: _manageSubscription,
-                      onLogout: _logoutThisDevice,
-                    ),
+                  _StatusPanel(
+                    status: status ?? LicenseStatus.inactive(),
+                    isSubmitting: _isSubmitting,
+                    onRefresh: _refresh,
+                    onManageSubscription: _manageSubscription,
+                    onLogout: _logoutThisDevice,
+                  ),
                 ],
               ),
             ),
@@ -411,102 +319,6 @@ class _LicenseScreenState extends State<LicenseScreen> {
 }
 
 AppLocalizations l10n(BuildContext context) => AppLocalizations.of(context);
-
-class _LoginPanel extends StatelessWidget {
-  const _LoginPanel({
-    required this.emailController,
-    required this.passwordController,
-    required this.isSubmitting,
-    required this.rememberMe,
-    required this.obscurePassword,
-    required this.onRememberMeChanged,
-    required this.onTogglePasswordVisibility,
-    required this.onLogin,
-    required this.onCreateLicense,
-  });
-
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final bool isSubmitting;
-  final bool rememberMe;
-  final bool obscurePassword;
-  final ValueChanged<bool> onRememberMeChanged;
-  final VoidCallback onTogglePasswordVisibility;
-  final VoidCallback onLogin;
-  final VoidCallback onCreateLicense;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: emailController,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
-            labelText: l10n.emailAddress,
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: passwordController,
-          obscureText: obscurePassword,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) {
-            if (!isSubmitting) {
-              onLogin();
-            }
-          },
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
-            labelText: l10n.password,
-            suffixIcon: IconButton(
-              onPressed: onTogglePasswordVisibility,
-              tooltip: obscurePassword ? l10n.showPassword : l10n.hidePassword,
-              icon: Icon(
-                obscurePassword
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-              ),
-            ),
-          ),
-        ),
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          value: rememberMe,
-          onChanged: isSubmitting
-              ? null
-              : (value) => onRememberMeChanged(value ?? false),
-          title: Text(l10n.rememberMe),
-        ),
-        const SizedBox(height: 12),
-        Text(l10n.personalLicenseInfo),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: isSubmitting ? null : onLogin,
-          icon: isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.login_outlined),
-          label: Text(l10n.signIn),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: isSubmitting ? null : onCreateLicense,
-          icon: const Icon(Icons.add_card_outlined),
-          label: Text(l10n.createLicense),
-        ),
-      ],
-    );
-  }
-}
 
 class _StatusPanel extends StatelessWidget {
   const _StatusPanel({

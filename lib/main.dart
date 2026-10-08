@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'l10n/generated/app_localizations.dart';
 import 'screens/license_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/app_config_service.dart';
 import 'services/app_locale_controller.dart';
 import 'services/license_service.dart';
@@ -140,6 +141,7 @@ class _StartupGate extends StatefulWidget {
 
 class _StartupGateState extends State<_StartupGate> {
   bool? _hasActiveSession;
+  bool _hasToken = false;
 
   @override
   void initState() {
@@ -158,7 +160,12 @@ class _StartupGateState extends State<_StartupGate> {
     if (!mounted) {
       return;
     }
-    setState(() => _hasActiveSession = canOpenApp);
+    final token = await widget.licenseService.getAuthToken();
+    if (!mounted) return;
+    setState(() {
+      _hasActiveSession = canOpenApp && token != null;
+      _hasToken = token != null;
+    });
   }
 
   void _openHome() {
@@ -179,6 +186,7 @@ class _StartupGateState extends State<_StartupGate> {
     if (hasActiveSession) {
       return HomeScreen(licenseService: widget.licenseService);
     }
+    if (!_hasToken) return LoginScreen(licenseService: widget.licenseService);
     return LicenseScreen(
       onContinue: _openHome,
       licenseService: widget.licenseService,

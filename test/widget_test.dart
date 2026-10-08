@@ -200,6 +200,9 @@ void main() {
 
 class _ActiveSessionLicenseService extends LicenseService {
   @override
+  Future<String?> getAuthToken() async => 'test-session';
+
+  @override
   Future<bool> hasActiveSession() async => true;
 
   @override
