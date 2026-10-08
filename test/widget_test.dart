@@ -3,10 +3,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:preventia_belgique_app/main.dart';
 import 'package:preventia_belgique_app/models/license_status.dart';
 import 'package:preventia_belgique_app/screens/document_form_screen.dart';
+import 'package:preventia_belgique_app/screens/document_type_screen.dart';
+import 'package:preventia_belgique_app/screens/home_screen.dart';
+import 'package:preventia_belgique_app/widgets/language_selector.dart';
 import 'package:preventia_belgique_app/services/app_config_service.dart';
 import 'package:preventia_belgique_app/services/app_locale_controller.dart';
 import 'package:preventia_belgique_app/services/license_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// The classic screens remain tested directly while their home entries are hidden.
+Future<void> openLegacyAnalysis(WidgetTester tester) async {
+  Navigator.of(
+    tester.element(find.byType(HomeScreen)),
+  ).push(MaterialPageRoute<void>(builder: (_) => const DocumentTypeScreen()));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets('PreventIA home screen is displayed', (
@@ -29,26 +40,33 @@ void main() {
       find.text('Assistant de prévention et bien-être au travail'),
       findsOneWidget,
     );
-    expect(find.text('Analyse de risques'), findsOneWidget);
-    expect(find.text('Dossier PreventIA'), findsOneWidget);
     expect(
-      find.text(
-        'Après la première analyse de risques, PreventIA vous proposera de choisir où créer le dossier local de la société.',
-      ),
+      find.text('Nouvelle analyse assistée').hitTestable(),
       findsOneWidget,
     );
-    expect(find.text('Documents de prévention'), findsOneWidget);
-    expect(find.text('Nouveau document'), findsNothing);
-    expect(find.text('Plan annuel d’action'), findsOneWidget);
-    expect(find.text('Plan global de prévention sur 5 ans'), findsOneWidget);
-    expect(find.text('Rapport de visite sécurité'), findsOneWidget);
-    expect(find.text('Fiche de poste'), findsOneWidget);
-    expect(find.text('Fiche d’instruction sécurité'), findsOneWidget);
-    expect(find.text('Rapport d’accident ou d’incident'), findsOneWidget);
-    expect(find.text('Documents d’urgence'), findsOneWidget);
-    expect(find.text('Plan Interne d’Urgence — PIU'), findsOneWidget);
-    expect(find.text('Historique'), findsOneWidget);
-    expect(find.text('Mentions et limites'), findsOneWidget);
+    expect(find.text('Historique').hitTestable(), findsOneWidget);
+    expect(find.byType(LanguageSelector), findsOneWidget);
+    expect(find.byType(OutlinedButton), findsNWidgets(2));
+    for (final label in [
+      'Analyse de risques',
+      'Dossier PreventIA',
+      'Documents de prévention',
+      'Nouveau document',
+      'Plan annuel d’action',
+      'Plan global de prévention sur 5 ans',
+      'Rapport de visite sécurité',
+      'Fiche de poste',
+      'Fiche d’instruction sécurité',
+      'Rapport d’accident ou d’incident',
+      'Documents d’urgence',
+      'Plan Interne d’Urgence — PIU',
+      'Mentions et limites',
+    ]) {
+      expect(find.text(label), findsNothing);
+    }
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    expect(find.text('Abonnement / Licence').hitTestable(), findsOneWidget);
 
     expect(find.text('0'), findsNothing);
   });
@@ -68,8 +86,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Risicoanalyse'));
-    await tester.pumpAndSettle();
+    await openLegacyAnalysis(tester);
     await tester.tap(find.text('Algemene risicoanalyse'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Invullen met een volledig voorbeeld'));
@@ -109,8 +126,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Risk assessment'));
-    await tester.pumpAndSettle();
+    await openLegacyAnalysis(tester);
     await tester.tap(find.text('General risk assessment'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fill with a complete example'));
@@ -137,8 +153,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Gefährdungsbeurteilung'));
-    await tester.pumpAndSettle();
+    await openLegacyAnalysis(tester);
     await tester.tap(find.text('Allgemeine Risikoanalyse'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mit vollständigem Beispiel ausfüllen'));
@@ -169,8 +184,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Gefährdungsbeurteilung'));
-    await tester.pumpAndSettle();
+    await openLegacyAnalysis(tester);
     await tester.tap(find.text('Allgemeine Risikoanalyse'));
     await tester.pumpAndSettle();
 

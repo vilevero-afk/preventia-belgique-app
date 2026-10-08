@@ -28,6 +28,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Anciennes entrées masquées temporairement pendant la migration vers l’analyse assistée.
+  static const _showLegacyEntries = false;
   late Future<PreventiaProject?> _projectFuture;
   late final LicenseService _licenseService;
 
@@ -132,16 +134,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 20),
-                        FilledButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const DocumentTypeScreen(),
+                        if (_showLegacyEntries) ...[
+                          FilledButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const DocumentTypeScreen(),
+                              ),
                             ),
+                            icon: const Icon(Icons.health_and_safety_outlined),
+                            label: Text(l10n.riskAssessment),
                           ),
-                          icon: const Icon(Icons.health_and_safety_outlined),
-                          label: Text(l10n.riskAssessment),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
+                        ],
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
@@ -152,58 +156,65 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: const Icon(Icons.playlist_add_check),
                           label: const Text('Nouvelle analyse assistée'),
                         ),
-                        const SizedBox(height: 20),
-                        Text(
-                          l10n.preventionDocuments,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.secondary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...documentTypes
-                            .where(isNewPreventionDocument)
-                            .map(
-                              (type) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: OutlinedButton.icon(
-                                  onPressed: () => Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => DocumentFormScreen(
-                                        documentType: type.label,
+                        if (_showLegacyEntries) ...[
+                          const SizedBox(height: 20),
+                          Text(
+                            l10n.preventionDocuments,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 12),
+                          ...documentTypes
+                              .where(isNewPreventionDocument)
+                              .map(
+                                (type) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => DocumentFormScreen(
+                                          documentType: type.label,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  icon: Icon(_iconFor(type)),
-                                  label: Text(
-                                    localizedDocumentTypeLabel(
-                                      type,
-                                      l10n.localeName,
+                                    icon: Icon(_iconFor(type)),
+                                    label: Text(
+                                      localizedDocumentTypeLabel(
+                                        type,
+                                        l10n.localeName,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                        const SizedBox(height: 12),
-                        Text(
-                          l10n.emergencyDocuments,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.secondary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const PiuFormScreen(),
-                            ),
+                          const SizedBox(height: 12),
+                          Text(
+                            l10n.emergencyDocuments,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
+                                  fontWeight: FontWeight.w800,
+                                ),
                           ),
-                          icon: const Icon(Icons.emergency_outlined),
-                          label: const Text('Plan Interne d’Urgence — PIU'),
-                        ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const PiuFormScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.emergency_outlined),
+                            label: const Text('Plan Interne d’Urgence — PIU'),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
@@ -214,37 +225,39 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: const Icon(Icons.history_outlined),
                           label: Text(l10n.history),
                         ),
-                        const SizedBox(height: 12),
-                        TextButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const LimitsScreen(),
+                        if (_showLegacyEntries) ...[
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const LimitsScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.info_outline),
+                            label: Text(l10n.limitsAndMentions),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const AiSettingsScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.settings_outlined),
+                            label: Text(l10n.aiSettings),
+                          ),
+                          const SizedBox(height: 12),
+                          FutureBuilder<PreventiaProject?>(
+                            future: _projectFuture,
+                            builder: (context, snapshot) => _projectAccess(
+                              context,
+                              snapshot.data,
+                              waiting:
+                                  snapshot.connectionState ==
+                                  ConnectionState.waiting,
                             ),
                           ),
-                          icon: const Icon(Icons.info_outline),
-                          label: Text(l10n.limitsAndMentions),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const AiSettingsScreen(),
-                            ),
-                          ),
-                          icon: const Icon(Icons.settings_outlined),
-                          label: Text(l10n.aiSettings),
-                        ),
-                        const SizedBox(height: 12),
-                        FutureBuilder<PreventiaProject?>(
-                          future: _projectFuture,
-                          builder: (context, snapshot) => _projectAccess(
-                            context,
-                            snapshot.data,
-                            waiting:
-                                snapshot.connectionState ==
-                                ConnectionState.waiting,
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

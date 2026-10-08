@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:preventia_belgique_app/l10n/generated/app_localizations.dart';
 import 'package:preventia_belgique_app/models/document_form_data.dart';
 import 'package:preventia_belgique_app/screens/piu_form_screen.dart';
+import 'package:preventia_belgique_app/screens/home_screen.dart';
 import 'package:preventia_belgique_app/services/ai_document_service.dart';
 import 'package:preventia_belgique_app/services/app_config_service.dart';
 import 'package:preventia_belgique_app/services/app_locale_controller.dart';
@@ -199,11 +200,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('PreventIA Belgique'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('Plan Interne d’Urgence — PIU'),
-      400,
-    );
-    await tester.tap(find.text('Plan Interne d’Urgence — PIU'));
+    // Reopen directly: the legacy PIU entry is temporarily hidden on home.
+    Navigator.of(
+      tester.element(find.byType(HomeScreen)),
+    ).push(MaterialPageRoute<void>(builder: (_) => const PiuFormScreen()));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Accueil'));
     await tester.pumpAndSettle();
