@@ -2,6 +2,57 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:preventia_belgique_app/services/risk_assessment_assistant_service.dart';
 
 void main() {
+  test(
+    'le remplissage de validation test permet une analyse finale complète',
+    () {
+      final dangers = RiskAssessmentAssistantService.dangersFor('Autre sujet');
+      final actions = RiskAssessmentAssistantService.actionsFor(
+        dangers,
+        'Installer un balisage',
+      );
+      RiskAssessmentAssistantService.fillValidationTest(dangers, actions);
+      for (final a in actions) {
+        expect(a.decision, AdvisorDecision.accepted);
+        expect(a.responsible, 'Service prévention');
+        expect(a.deadline, '3 mois');
+        expect(
+          a.finalEvidence,
+          'Photo après correction ou preuve documentaire',
+        );
+        expect(a.advisorComment, 'À vérifier et valider sur site.');
+      }
+      expect(
+        RiskAssessmentAssistantService.validationErrors(dangers, actions),
+        isEmpty,
+      );
+      final text = RiskAssessmentAssistantService.finalAnalysis(
+        subject: 'Bureau',
+        answers: {'Qui est exposé ?': 'Personnel'},
+        questions: [FieldQuestion('Observation terrain ?')],
+        dangers: dangers,
+        actions: actions,
+        advisor: 'Service prévention',
+        conclusion: 'À vérifier et valider sur site.',
+      );
+      for (final value in [
+        'Analyse finale assistée de risques',
+        'Bureau',
+        'Personnel',
+        'Observation terrain ?',
+        'Installer un balisage',
+        '3 mois',
+        'Photo après correction ou preuve documentaire',
+        'Commentaire conseiller',
+        'Conclusion finale',
+        'Signatures',
+      ]) {
+        expect(text, contains(value));
+      }
+      expect(text, isNot(contains('PIU')));
+      expect(text, isNot(contains('a_verifier')));
+    },
+  );
+
   test('ergonomie et écran proposent les questions et dangers attendus', () {
     for (final subject in ['Ergonomie', 'ÉCRAN']) {
       final questions = RiskAssessmentAssistantService.questionsFor(subject);

@@ -17,6 +17,7 @@ class RiskAssessmentAssistantScreen extends StatefulWidget {
 
 class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   final _subject = TextEditingController();
+  final _contentScroll = ScrollController();
   final _answers = <String, String>{};
   final _conclusions = <String, String>{};
   final _decisions = <String, String>{};
@@ -27,6 +28,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   String _advisor = '';
   String _finalConclusion = '';
   String? _finalMarkdown;
+  bool _draftCreated = false;
   int _step = 0;
   int _revision = 0;
   bool _saving = false;
@@ -45,6 +47,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   @override
   void dispose() {
     _subject.dispose();
+    _contentScroll.dispose();
     super.dispose();
   }
 
@@ -120,6 +123,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       );
     }
     setState(() => _step++);
+    _scrollToTop();
   }
 
   void _seed(String subject) {
@@ -128,6 +132,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     _seededSubject = subject;
     _conclusions.clear();
     _actions.clear();
+    _draftCreated = false;
     _finalMarkdown = null;
     _status = 'Brouillon';
     _revision++;
@@ -430,31 +435,13 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
                   onChanged: (v) => setState(() => _decisions[label] = v!),
                 ),
               ),
-            OutlinedButton.icon(
-              onPressed: _saving ? null : _exportWord,
-              icon: const Icon(Icons.download_outlined),
-              label: const Text('Exporter Word'),
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: _saving ? null : _saveToCompanyFolder,
-              icon: const Icon(Icons.folder_copy_outlined),
-              label: const Text('Sauvegarder dans le dossier société'),
-            ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: _saving ? null : _createDraft,
-              icon: const Icon(Icons.description_outlined),
-              label: Text(
-                _saving ? 'Enregistrement…' : 'Créer un brouillon d’analyse',
-              ),
-            ),
           ],
         );
     }
   }
 
   Widget _review(AdvisorReview review) => Column(
+    key: ValueKey((review, _revision)),
     children: [
       DropdownButtonFormField<AdvisorDecision>(
         initialValue: review.decision,
@@ -489,7 +476,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         (v) => setState(() => review.deadline = v),
       ),
       _field(
-        'Preuve finale attendue',
+        'Preuve attendue',
         review.finalEvidence,
         (v) => setState(() => review.finalEvidence = v),
       ),
@@ -497,22 +484,10 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   );
 
   Widget _validation() {
-    final errors = RiskAssessmentAssistantService.validationErrors(
-      _dangers,
-      _actions,
-    );
     if (_finalMarkdown != null) {
       return Column(
         children: [
-          const Text('Analyse finale créée'),
-          OutlinedButton(
-            onPressed: _exportWord,
-            child: const Text('Exporter Word — analyse finale'),
-          ),
-          FilledButton(
-            onPressed: _saving ? null : _saveToCompanyFolder,
-            child: const Text('Sauvegarder dans le dossier prévention'),
-          ),
+          const Text('Document validé par le conseiller.'),
           TextButton(
             onPressed: () => _showDraft(_finalMarkdown!),
             child: const Text('Consulter l’analyse finale'),
@@ -533,41 +508,10 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         const Text(
           'Le conseiller en prévention garde la décision finale. Destination : analyse finale, PAA/PGP, dossier prévention et preuves/photos.',
         ),
-        for (final d in _dangers)
-          Card(
-            key: ObjectKey(d),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  _field('Danger', d.danger, (v) => d.danger = v),
-                  _field(
-                    'Scénario plausible',
-                    d.scenario,
-                    (v) => d.scenario = v,
-                  ),
-                  _field('Personnes exposées', d.people, (v) => d.people = v),
-                  _rating('Gravité', d.gravity, (v) => d.gravity = v),
-                  _rating(
-                    'Probabilité',
-                    d.probability,
-                    (v) => d.probability = v,
-                  ),
-                  _rating('Exposition', d.exposure, (v) => d.exposure = v),
-                  Text(
-                    'Score : ${d.score ?? 'Non coté'} — Niveau : ${d.level}',
-                  ),
-                  _field(
-                    'Mesure proposée',
-                    d.proposedMeasure,
-                    (v) => d.proposedMeasure = v,
-                  ),
-                  _field('Preuve attendue', d.evidence, (v) => d.evidence = v),
-                  _review(d),
-                ],
-              ),
-            ),
-          ),
+        const Text(
+          'Actions proposées',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         for (final a in _actions)
           Card(
             key: ObjectKey(a),
@@ -601,32 +545,89 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
               ),
             ),
           ),
+        const Text(
+          'Dangers et cotations',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        for (final d in _dangers)
+          Card(
+            key: ValueKey((d, _revision)),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _field('Danger', d.danger, (v) => d.danger = v),
+                  _field(
+                    'Scénario plausible',
+                    d.scenario,
+                    (v) => d.scenario = v,
+                  ),
+                  _field('Personnes exposées', d.people, (v) => d.people = v),
+                  _rating('Gravité', d.gravity, (v) => d.gravity = v),
+                  _rating(
+                    'Probabilité',
+                    d.probability,
+                    (v) => d.probability = v,
+                  ),
+                  _rating('Exposition', d.exposure, (v) => d.exposure = v),
+                  Text(
+                    'Score : ${d.score ?? 'Non coté'} — Niveau : ${d.level}',
+                  ),
+                  _field(
+                    'Mesure proposée',
+                    d.proposedMeasure,
+                    (v) => d.proposedMeasure = v,
+                  ),
+                  _field('Preuve attendue', d.evidence, (v) => d.evidence = v),
+                  _review(d),
+                ],
+              ),
+            ),
+          ),
         _field(
           'Conseiller en prévention',
           _advisor,
           (v) => setState(() => _advisor = v),
+          key: ValueKey('advisor-$_revision'),
         ),
         _field(
           'Conclusion finale du conseiller',
           _finalConclusion,
           (v) => setState(() => _finalConclusion = v),
-        ),
-        if (errors.isNotEmpty) Text(errors.join('\n')),
-        FilledButton(
-          onPressed:
-              errors.isNotEmpty ||
-                  _advisor.trim().isEmpty ||
-                  _finalConclusion.trim().isEmpty ||
-                  _saving
-              ? null
-              : _createFinal,
-          child: const Text('Créer l’analyse finale'),
+          key: ValueKey('conclusion-$_revision'),
         ),
       ],
     );
   }
 
   Future<void> _createFinal() async {
+    final missingDetails = _actions.any(
+      (a) =>
+          a.retained &&
+          [
+            a.responsible,
+            a.deadline,
+            a.finalEvidence,
+          ].any((v) => v.trim().isEmpty),
+    );
+    if (missingDetails) {
+      _message(
+        'Complétez responsable, délai et preuve attendue pour les actions acceptées.',
+      );
+      return;
+    }
+    final errors = RiskAssessmentAssistantService.validationErrors(
+      _dangers,
+      _actions,
+    );
+    if (errors.isNotEmpty) {
+      _message(errors.join('\n'));
+      return;
+    }
+    if (_advisor.trim().isEmpty || _finalConclusion.trim().isEmpty) {
+      _message('Complétez le nom du conseiller et sa conclusion finale.');
+      return;
+    }
     final markdown = RiskAssessmentAssistantService.finalAnalysis(
       subject: _subject.text,
       answers: _answers,
@@ -664,6 +665,108 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     }
   }
 
+  void _message(String text) {
+    ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  void _scrollToTop() {
+    if (_contentScroll.hasClients) _contentScroll.jumpTo(0);
+  }
+
+  void _startValidation() {
+    setState(() {
+      _actions = RiskAssessmentAssistantService.actionsFor(
+        _dangers,
+        _conclusions['Actions proposées'] ?? '',
+      );
+      _status = 'En validation';
+      _step = 6;
+    });
+    _scrollToTop();
+  }
+
+  void _fillValidationTest() {
+    setState(() {
+      RiskAssessmentAssistantService.fillValidationTest(_dangers, _actions);
+      if (_advisor.trim().isEmpty) _advisor = 'Service prévention';
+      if (_finalConclusion.trim().isEmpty) {
+        _finalConclusion = 'À vérifier et valider sur site.';
+      }
+      _revision++;
+    });
+    _message(
+      'Validation test remplie. Les décisions et cotations de test restent à vérifier sur site.',
+    );
+  }
+
+  Widget _documentControls() => Padding(
+    padding: const EdgeInsets.all(12),
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (_step < 5)
+          FilledButton(
+            onPressed: _saving ? null : _next,
+            child: const Text('Suivant'),
+          ),
+        if (_step > 0)
+          TextButton(
+            onPressed: _saving
+                ? null
+                : () {
+                    setState(() {
+                      _step--;
+                      _finalMarkdown = null;
+                      _status = 'Brouillon';
+                    });
+                    _scrollToTop();
+                  },
+            child: const Text('Précédent'),
+          ),
+        if (_step == 5 && !_draftCreated)
+          FilledButton(
+            onPressed: _saving ? null : _createDraft,
+            child: const Text('Créer un brouillon d’analyse'),
+          ),
+        if (_draftCreated && _finalMarkdown == null) ...[
+          OutlinedButton(
+            onPressed: _saving ? null : () => _exportWord(),
+            child: const Text('Exporter Word — brouillon'),
+          ),
+          if (_step != 6)
+            FilledButton(
+              onPressed: _saving ? null : _startValidation,
+              child: const Text('Passer à la validation'),
+            ),
+        ],
+        if (_draftCreated)
+          OutlinedButton(
+            onPressed: _saving ? null : _saveToCompanyFolder,
+            child: const Text('Sauvegarder dans le dossier société'),
+          ),
+        if (_step == 6 && _finalMarkdown == null) ...[
+          OutlinedButton(
+            onPressed: _saving ? null : _fillValidationTest,
+            child: const Text('Remplir validation test'),
+          ),
+          FilledButton(
+            onPressed: _saving ? null : _createFinal,
+            child: const Text('Créer l’analyse finale'),
+          ),
+        ],
+        if (_finalMarkdown != null) ...[
+          const Text('Analyse finale créée'),
+          FilledButton(
+            onPressed: _saving ? null : () => _exportWord(finalDocument: true),
+            child: const Text('Exporter Word — analyse finale'),
+          ),
+        ],
+      ],
+    ),
+  );
+
   Widget _rating(String label, int? value, ValueChanged<int?> change) =>
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -682,9 +785,20 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         ),
       );
 
-  Future<void> _exportWord() async {
+  Future<void> _exportWord({bool finalDocument = false}) async {
+    setState(() => _saving = true);
+    try {
+      await _writeWord(finalDocument: finalDocument);
+    } catch (error) {
+      if (mounted) _message('Export Word impossible : $error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _writeWord({required bool finalDocument}) async {
     final subject = _subject.text.trim();
-    if (subject.isEmpty || (_questions.isEmpty && _finalMarkdown == null)) {
+    if (subject.isEmpty || (finalDocument && _finalMarkdown == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Créez d’abord le brouillon d’analyse assistée.'),
@@ -692,22 +806,22 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       );
       return;
     }
-    final markdown =
-        _finalMarkdown ??
-        RiskAssessmentAssistantService.draft(
-          subject: subject,
-          answers: _answers,
-          questions: _questions,
-          dangers: _dangers,
-          conclusions: _conclusions,
-          decisions: _decisions,
-        );
+    final markdown = finalDocument
+        ? _finalMarkdown!
+        : RiskAssessmentAssistantService.draft(
+            subject: subject,
+            answers: _answers,
+            questions: _questions,
+            dangers: _dangers,
+            conclusions: _conclusions,
+            decisions: _decisions,
+          );
     final now = DateTime.now();
     final document = PreventiaCompanyDocument(
       id: 'assistant-export',
       documentType: 'Analyse assistée de risques',
       title: 'Analyse assistée — $subject',
-      status: _status,
+      status: finalDocument ? 'Analyse finale créée' : 'Brouillon',
       createdAt: now,
       autoCreated: false,
       source: 'assistant_local',
@@ -725,13 +839,16 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
         )
         .replaceAll(RegExp(r'^_+|_+$'), '');
     final name =
-        'analyse_assistee_${slug(subject)}_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.docx';
+        'analyse_assistee_${finalDocument ? 'finale' : 'brouillon'}_${slug(subject)}_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.docx';
     await FileExportService.saveDocxBytes(
       bytes: bytes,
       suggestedFileName: name,
       context: context,
       successMessage: 'Document Word généré.',
-      errorMessage: 'Impossible de générer le document Word.',
+      errorMessage: 'Export Word impossible',
+      onError: (error) {
+        if (mounted) _message('Export Word impossible : $error');
+      },
       showResultMessage: true,
     );
   }
@@ -754,17 +871,18 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       final saved = await prefs.setString(_draftKey, markdown);
       if (!saved) throw StateError('Enregistrement local indisponible');
       if (mounted) {
-        await _showDraft(markdown);
-        if (mounted) {
-          setState(() {
-            _actions = RiskAssessmentAssistantService.actionsFor(
-              _dangers,
-              _conclusions['Actions proposées'] ?? '',
-            );
-            _status = 'En validation';
-            _step = 6;
-          });
-        }
+        setState(() {
+          _draftCreated = true;
+          _finalMarkdown = null;
+          _status = 'Brouillon';
+          _actions = RiskAssessmentAssistantService.actionsFor(
+            _dangers,
+            _conclusions['Actions proposées'] ?? '',
+          );
+        });
+        _message(
+          'Brouillon créé. Vous pouvez exporter le Word ou passer à la validation.',
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -809,6 +927,8 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
           ),
         );
       }
+    } catch (error) {
+      if (mounted) _message('Sauvegarde impossible : $error');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -862,6 +982,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Assistant d’analyse de risques')),
+    bottomNavigationBar: SafeArea(child: _documentControls()),
     body: Column(
       children: [
         Text('Statut : $_status'),
@@ -876,41 +997,19 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
           ),
         ),
         Expanded(
-          child: Stepper(
-            currentStep: _step,
-            onStepContinue: _step < 5 ? _next : null,
-            onStepCancel: _step > 0
-                ? () => setState(() {
-                    _step--;
-                    _finalMarkdown = null;
-                    _status = 'Brouillon';
-                  })
-                : null,
-            controlsBuilder: (context, details) => Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Wrap(
-                spacing: 12,
-                children: [
-                  if (_step < 5)
-                    FilledButton(
-                      onPressed: details.onStepContinue,
-                      child: const Text('Suivant'),
-                    ),
-                  if (_step > 0)
-                    TextButton(
-                      onPressed: details.onStepCancel,
-                      child: const Text('Précédent'),
-                    ),
-                ],
-              ),
-            ),
-            steps: List.generate(
-              _titles.length,
-              (i) => Step(
-                title: Text('Étape ${i + 1} — ${_titles[i]}'),
-                isActive: i <= _step,
-                content: i == _step ? _content(i) : const SizedBox.shrink(),
-              ),
+          child: SingleChildScrollView(
+            controller: _contentScroll,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Étape ${_step + 1} — ${_titles[_step]}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                _content(_step),
+              ],
             ),
           ),
         ),

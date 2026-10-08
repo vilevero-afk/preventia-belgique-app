@@ -61,6 +61,30 @@ void main() {
     expect(xml, isNot(contains('Page 1 / 1')));
     expect(xml, isNot(contains('SCÉNARIO TEST SPGE')));
   });
+  test(
+    'le markdown Word du brouillon nettoie les marqueurs et les réponses internes',
+    () {
+      final dirty = document.copyWith(
+        markdown:
+            '${document.markdown}\na_verifier\nPage 1 / 1\nSCÉNARIO TEST SPGE\nIntégration PIU : Oui',
+      );
+      final text = DocxExportService.assistedRiskExportMarkdown(dirty);
+      expect(text, contains('À vérifier'));
+      for (final marker in [
+        'Page 1 / 1',
+        'SCÉNARIO TEST SPGE',
+        'a_verifier',
+        'Intégration PIU',
+      ]) {
+        expect(text, isNot(contains(marker)));
+      }
+      expect(
+        DocxExportService.buildAssistedRiskAssessmentDocx(dirty),
+        isNotEmpty,
+      );
+    },
+  );
+
   test('sanitizer removes noise and empty sections', () {
     final cleaned = sanitizeAssistedRiskMarkdownForExport(
       '# Titre\n\nRéférence AR-2026 — Page 1 / 1\nSCÉNARIO TEST SPGE\nDocument : Analyse de risques générale\n```debug\nsecret\n```\n## Vide\n\n## Contenu\nTexte\n\n\n\n',

@@ -113,7 +113,8 @@ void main() {
       reference: '',
       companyName: '',
       formData: const {'subject': 'Bureau'},
-      markdown: finalText([action]),
+      markdown:
+          '${finalText([action])}\na_verifier\nPage 1 / 1\nSCÉNARIO TEST SPGE\nIntégration PIU : Oui',
     );
     final markdown = DocxExportService.assistedRiskExportMarkdown(document);
     expect(markdown, isNot(contains('Brouillon')));
@@ -121,7 +122,9 @@ void main() {
       DocxExportService.buildAssistedRiskAssessmentDocx(document),
       allowMalformed: true,
     );
+    expect(xml, contains('Analyse finale assistée de risques'));
     expect(xml, contains('Balisage'));
+    expect(xml, isNot(contains('a_verifier')));
     expect(xml, isNot(contains('PIU')));
     expect(xml, isNot(contains('Page 1 / 1')));
     expect(xml, isNot(contains('SCÉNARIO TEST SPGE')));

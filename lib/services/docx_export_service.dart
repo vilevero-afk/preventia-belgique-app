@@ -1459,7 +1459,9 @@ const _appXml = '''
 ''';
 
 String sanitizeAssistedRiskMarkdownForExport(String markdown) {
-  var text = markdown.replaceAll('\r\n', '\n');
+  var text = markdown
+      .replaceAll('\r\n', '\n')
+      .replaceAll('a_verifier', 'À vérifier');
   text = text.replaceAll(
     RegExp(
       r'```(?:debug|json|log|logs)[^\n]*\n[\s\S]*?```',
@@ -1472,7 +1474,7 @@ String sanitizeAssistedRiskMarkdownForExport(String markdown) {
       .split('\n')
       .where(
         (line) => !RegExp(
-          r'Page\s+1\s*/\s*1|SC[ÉE]NARIO TEST SPGE|Document\s*:\s*Analyse de risques|^\s*(?:\[DEBUG\]|DEBUG\s*:)',
+          r'Intégration PIU|Page\s+1\s*/\s*1|SC[ÉE]NARIO TEST SPGE|Document\s*:\s*Analyse de risques|^\s*(?:\[DEBUG\]|DEBUG\s*:)',
           caseSensitive: false,
         ).hasMatch(line),
       )

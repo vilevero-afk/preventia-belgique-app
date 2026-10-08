@@ -153,6 +153,7 @@ class FileExportService {
     required String errorMessage,
     ProjectExportDetails? projectDetails,
     bool showResultMessage = true,
+    void Function(Object error)? onError,
   }) async {
     if (!usesSaveDialog) {
       try {
@@ -181,13 +182,17 @@ class FileExportService {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(successMessage)));
-      } catch (_) {
+      } catch (error) {
         if (!context.mounted) {
           return null;
         }
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(errorMessage)));
+        if (onError != null) {
+          onError(error);
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMessage)));
+        }
       }
       return null;
     }
@@ -271,9 +276,13 @@ class FileExportService {
       if (!context.mounted) {
         return null;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('$errorMessage : $error')));
+      if (onError != null) {
+        onError(error);
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$errorMessage : $error')));
+      }
       return null;
     }
   }

@@ -473,6 +473,24 @@ class RiskAssessmentAssistantService {
       AssistantAction(line.trim(), linkedRisk: 'À préciser par le conseiller'),
   ];
 
+  static void fillValidationTest(
+    List<AssistantDanger> dangers,
+    List<AssistantAction> actions,
+  ) {
+    for (final review in <AdvisorReview>[...dangers, ...actions]) {
+      review.decision = AdvisorDecision.accepted;
+      review.responsible = 'Service prévention';
+      review.deadline = '3 mois';
+      review.finalEvidence = 'Photo après correction ou preuve documentaire';
+      review.advisorComment = 'À vérifier et valider sur site.';
+    }
+    for (final d in dangers) {
+      d.gravity ??= 3;
+      d.probability ??= 3;
+      d.exposure ??= 3;
+    }
+  }
+
   static List<String> validationErrors(
     List<AssistantDanger> dangers,
     List<AssistantAction> actions,
@@ -513,7 +531,7 @@ class RiskAssessmentAssistantService {
     final errors = validationErrors(dangers, actions);
     if (errors.isNotEmpty) throw StateError(errors.join('\n'));
     final b = StringBuffer(
-      '# Analyse finale de risques\n\nDocument validé par le conseiller en prévention : $advisor.\n\n## Sujet',
+      '# Analyse finale assistée de risques\n\nDocument validé par le conseiller en prévention : $advisor.\n\n## Sujet',
     );
     b.writeln(
       draft(
