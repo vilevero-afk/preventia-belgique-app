@@ -8,6 +8,7 @@ import '../models/preventia_company_project.dart';
 import '../models/preventia_project.dart';
 import 'company_piu_candidate_cleanup_service.dart';
 import 'local_document_storage.dart';
+import 'risk_assessment_assistant_service.dart';
 import 'preventia_company_extraction_service.dart';
 
 class PreventiaCompanyUpdateResult {
@@ -355,6 +356,8 @@ class PreventiaCompanyProjectService {
   Future<PreventiaCompanyProject> saveAssistedDraft({
     required String subject,
     required String markdown,
+    String status = 'Brouillon à valider',
+    List<AssistantAction> actions = const [],
     String? companyName,
     String? siteName,
   }) async {
@@ -368,19 +371,56 @@ class PreventiaCompanyProjectService {
       id: _uuid.v4(),
       documentType: 'Analyse assistée de risques',
       title: 'Analyse assistée — ${subject.trim()}',
-      status: 'Brouillon à valider',
+      status: status,
       createdAt: now,
       updatedAt: now,
       autoCreated: false,
       source: 'assistant_local',
-      isAssistedDraft: true,
+      isAssistedDraft: status != 'Analyse finale créée',
       markdown: markdown,
       reference: reference,
       companyName: project.companyName,
       siteName: siteName?.trim() ?? '',
-      formData: {'subject': subject.trim()},
+      formData: {
+        'subject': subject.trim(),
+        if (status == 'Analyse finale créée')
+          'actions': [
+            for (final a in actions.where((a) => a.retained))
+              {
+                'action': a.action,
+                'risk': a.linkedRisk,
+                'priority': a.priority,
+                'type': a.type,
+                'integration': a.integration,
+                'status': 'validé',
+                'advisorDecision': a.decision!.label,
+                'responsible': a.responsible,
+                'deadline': a.deadline,
+                'evidence': a.finalEvidence,
+              },
+          ],
+      },
     );
     final updated = project.copyWith(
+      actionItems: [
+        ...project.actionItems,
+        if (status == 'Analyse finale créée')
+          for (final a in actions.where((a) => a.retained))
+            PreventiaActionItem(
+              id: _uuid.v4(),
+              sourceDocumentId: document.id,
+              sourceDocumentType: document.documentType,
+              action: a.action,
+              priority: a.priority,
+              responsible: a.responsible,
+              deadline: a.deadline,
+              status: 'validé',
+              evidenceExpected: a.finalEvidence,
+              destination: 'PGA/PAA/PGP',
+              createdAt: now,
+              updatedAt: now,
+            ),
+      ],
       updatedAt: now,
       sites: _mergeSites(project.sites, document.siteName),
       analyses: _mergeDocuments(project.analyses, [document]),
@@ -1408,6 +1448,12 @@ List<_CleanPgpAction> _cleanPgpActions(
 ) {
   final byAction = <String, _CleanPgpAction>{};
   for (final item in items) {
+    // Structured assisted actions below carry the final risk and type.
+    if (project.analyses.any(
+      (d) => d.id == item.sourceDocumentId && d.source == 'assistant_local',
+    )) {
+      continue;
+    }
     if (classifyReviewCandidate(item).destination != 'pgp') continue;
     if (!_isValidPgpActionText(item.action)) continue;
     final action = _cleanConcretePgpAction(item.action);
@@ -1448,13 +1494,19 @@ List<_CleanPgpAction> _extractPgpActionsFromProject(
 ) {
   final byActionAndRisk = <String, _CleanPgpAction>{};
 
-  void add(_CleanPgpAction action) {
+  void add(_CleanPgpAction action, {bool advisorValidated = false}) {
     if (!_isValidatedStatus(action.status)) return;
-    if (!_isValidPgpActionText(action.action)) return;
+    if (advisorValidated
+        ? action.action.trim().isEmpty
+        : !_isValidPgpActionText(action.action)) {
+      return;
+    }
     final cleaned = _CleanPgpAction(
       source: _fallback(action.source, 'Analyse de risques'),
       risk: _fallback(action.risk, 'Risque à préciser'),
-      action: _cleanConcretePgpAction(action.action),
+      action: advisorValidated
+          ? action.action.trim()
+          : _cleanConcretePgpAction(action.action),
       type: _fallback(action.type, 'Action de prévention'),
       priority: _fallback(action.priority, 'À planifier'),
       responsible: _fallback(action.responsible, '[à compléter]'),
@@ -1462,7 +1514,7 @@ List<_CleanPgpAction> _extractPgpActionsFromProject(
       evidence: _fallback(action.evidence, '[à compléter]'),
       status: 'validé',
     );
-    if (!_isValidPgpActionText(cleaned.action)) return;
+    if (!advisorValidated && !_isValidPgpActionText(cleaned.action)) return;
     final key =
         '${_dedupePgpKey(cleaned.action)}|${_dedupePgpKey(cleaned.risk)}';
     final existing = byActionAndRisk[key];
@@ -1491,7 +1543,12 @@ List<_CleanPgpAction> _extractPgpActionsFromProject(
       add(action);
     }
     for (final action in _extractPgpActionsFromFormData(document)) {
-      add(action);
+      add(
+        action,
+        advisorValidated:
+            document.source == 'assistant_local' &&
+            document.status == 'Analyse finale créée',
+      );
     }
   }
 
@@ -1513,7 +1570,11 @@ List<PreventiaCompanyDocument> _analysisDocuments(
   void add(PreventiaCompanyDocument document) {
     final type = normalizeCompanyName(document.documentType);
     final title = normalizeCompanyName(document.title);
-    if (!type.contains('analyse de risques') &&
+    final isAssistedFinal =
+        document.source == 'assistant_local' &&
+        document.status == 'Analyse finale créée';
+    if (!isAssistedFinal &&
+        !type.contains('analyse de risques') &&
         !title.contains('analyse de risques')) {
       return;
     }
@@ -1532,6 +1593,8 @@ List<PreventiaCompanyDocument> _analysisDocuments(
 List<_CleanPgpAction> _extractPgpActionsFromAnalysis(
   PreventiaCompanyDocument document,
 ) {
+  // Assisted assessments contribute only the actions explicitly retained by the advisor.
+  if (document.source == 'assistant_local') return [];
   final normalizedLabel = normalizeCompanyName(
     '${document.documentType} ${document.title}',
   );

@@ -49,6 +49,11 @@ class DocxExportService {
 
   static String assistedRiskExportMarkdown(PreventiaCompanyDocument document) {
     final body = sanitizeAssistedRiskMarkdownForExport(document.markdown);
+    if (document.status == 'Analyse finale créée') {
+      return sanitizeAssistedRiskMarkdownForExport(
+        'Référence : ${document.reference}\nDate : ${_formatDate(document.createdAt)}\nEntreprise : ${document.companyName}\nStatut : Analyse finale créée\n\n$body',
+      );
+    }
     return sanitizeAssistedRiskMarkdownForExport(
       '# Analyse assistée de risques\n\n'
       'Référence : ${document.reference}\n'

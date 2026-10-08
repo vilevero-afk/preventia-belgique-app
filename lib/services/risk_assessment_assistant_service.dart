@@ -21,12 +21,59 @@ class FieldQuestion {
   set verified(bool value) => status = value ? 'vérifié' : 'à compléter';
 }
 
-class AssistantDanger {
-  AssistantDanger(this.danger);
+enum AdvisorDecision { accepted, modified, refused }
+
+extension AdvisorDecisionLabel on AdvisorDecision {
+  String get label => switch (this) {
+    AdvisorDecision.accepted => 'Accepté',
+    AdvisorDecision.modified => 'Modifié',
+    AdvisorDecision.refused => 'Refusé',
+  };
+}
+
+class AdvisorReview {
+  AdvisorDecision? decision;
+  String advisorComment = '';
+  String responsible = '';
+  String deadline = '';
+  String finalEvidence = '';
+  bool get retained =>
+      decision == AdvisorDecision.accepted ||
+      decision == AdvisorDecision.modified;
+}
+
+class AssistantAction extends AdvisorReview {
+  AssistantAction(
+    this.action, {
+    this.linkedRisk = '',
+    this.priority = 'À déterminer',
+    this.type = 'organisationnelle',
+    this.integration = 'PAA',
+  });
+  String action;
+  String linkedRisk;
+  String priority;
+  String type;
+  String integration;
+  static const types = [
+    'technique',
+    'organisationnelle',
+    'formation',
+    'preuve',
+    'achat',
+    'procédure',
+  ];
+}
+
+class AssistantDanger extends AdvisorReview {
+  AssistantDanger(this.danger)
+    : proposedMeasure =
+          'Vérifier $danger sur le terrain et définir les mesures adaptées.';
   String danger;
   String scenario = '';
   String people = '';
   String measures = '';
+  String proposedMeasure;
   String evidence = '';
   String photo = '';
   int? gravity;
@@ -72,7 +119,6 @@ class RiskAssessmentAssistantService {
   static const decisionLabels = [
     'Avis externe nécessaire',
     'Intégration PAA/PGP',
-    'Intégration PIU',
   ];
   static String _normalize(String subject) => subject
       .toLowerCase()
@@ -406,6 +452,120 @@ class RiskAssessmentAssistantService {
     };
   }
 
+  static List<AssistantAction> actionsFor(
+    List<AssistantDanger> dangers,
+    String proposals,
+  ) => [
+    for (final d in dangers)
+      AssistantAction(
+        d.proposedMeasure,
+        linkedRisk: d.danger,
+        priority: d.level,
+      ),
+    for (final line
+        in proposals
+            .split('\n')
+            .where(
+              (s) =>
+                  s.trim().isNotEmpty &&
+                  !dangers.any((d) => d.proposedMeasure == s.trim()),
+            ))
+      AssistantAction(line.trim(), linkedRisk: 'À préciser par le conseiller'),
+  ];
+
+  static List<String> validationErrors(
+    List<AssistantDanger> dangers,
+    List<AssistantAction> actions,
+  ) {
+    final errors = <String>[];
+    if (dangers.isEmpty) errors.add('Ajoutez au moins un danger.');
+    for (final d in dangers) {
+      if (d.decision == null) errors.add('Décision requise : ${d.danger}');
+      if (d.retained && d.score == null) {
+        errors.add('Cotation finale requise : ${d.danger}');
+      }
+    }
+    for (final a in actions) {
+      if (a.decision == null) errors.add('Décision requise : ${a.action}');
+      if (a.retained &&
+          [
+            a.responsible,
+            a.deadline,
+            a.finalEvidence,
+          ].any((v) => v.trim().isEmpty)) {
+        errors.add(
+          'Responsable, délai et preuve attendue requis : ${a.action}',
+        );
+      }
+    }
+    return errors;
+  }
+
+  static String finalAnalysis({
+    required String subject,
+    required Map<String, String> answers,
+    required List<FieldQuestion> questions,
+    required List<AssistantDanger> dangers,
+    required List<AssistantAction> actions,
+    required String conclusion,
+    required String advisor,
+  }) {
+    final errors = validationErrors(dangers, actions);
+    if (errors.isNotEmpty) throw StateError(errors.join('\n'));
+    final b = StringBuffer(
+      '# Analyse finale de risques\n\nDocument validé par le conseiller en prévention : $advisor.\n\n## Sujet',
+    );
+    b.writeln(
+      draft(
+            subject: subject,
+            answers: answers,
+            questions: questions,
+            dangers: dangers.where((d) => d.retained).toList(),
+            conclusions: {},
+            decisions: {},
+          )
+          .split('## Sujet')
+          .last
+          .split('## Conclusions provisoires')
+          .first
+          .replaceAll('cotations provisoires', 'cotations finales')
+          .replaceAll(
+            'Échelle expérimentale',
+            'Échelle validée par le conseiller',
+          )
+          .replaceAll('Seuils à valider.', ''),
+    );
+    for (final d in dangers.where((d) => d.retained)) {
+      b.writeln(
+        '### Décision — ${d.danger}\nStatut : ${d.decision!.label}\nMesure proposée validée : ${d.proposedMeasure}\nCommentaire conseiller : ${d.advisorComment}\nResponsable : ${d.responsible}\nDélai : ${d.deadline}\nPreuve finale attendue : ${d.finalEvidence}\n',
+      );
+    }
+    void writeAction(AssistantAction a) {
+      b.writeln(
+        '### ${a.action}\nRisque lié : ${a.linkedRisk}\nPriorité : ${a.priority}\nType : ${a.type}\nIntégration : ${a.integration}\nStatut conseiller : ${a.decision!.label}\nCommentaire conseiller : ${a.advisorComment}\nResponsable : ${a.responsible}\nDélai : ${a.deadline}\nPreuve attendue : ${a.finalEvidence}\n',
+      );
+    }
+
+    b.writeln('## Actions finales — PAA/PGP');
+    for (final a in actions.where((a) => a.retained)) {
+      writeAction(a);
+    }
+    b.writeln('## Annexe — Actions refusées');
+    for (final a in actions.where(
+      (a) => a.decision == AdvisorDecision.refused,
+    )) {
+      writeAction(a);
+    }
+    b.writeln(
+      '## Conclusion finale du conseiller\n$conclusion\n\n## Signatures\nConseiller en prévention : $advisor\nSignature : ____________________\nEmployeur : ____________________\nDate : ____________________',
+    );
+    return b
+        .toString()
+        .replaceAll(RegExp(r'Page\s+1\s*/\s*1', caseSensitive: false), '')
+        .replaceAll('SCÉNARIO TEST SPGE', '')
+        .replaceAll('SCENARIO TEST SPGE', '');
+  }
+
   static String draft({
     required String subject,
     required Map<String, String> answers,
@@ -453,7 +613,7 @@ class RiskAssessmentAssistantService {
       b.writeln('- $label : ${value(decisions[label])}');
     }
     b.writeln(
-      '\n## Validation\nBrouillon non validé. Observation terrain, compléments et validation requis avant utilisation. Les choix PAA/PGP et PIU sont des intentions à valider, sans intégration automatique.',
+      '\n## Validation\nBrouillon non validé. Observation terrain, compléments et validation requis avant utilisation. Les choix PAA/PGP sont des intentions à valider, sans intégration automatique.',
     );
     return b
         .toString()

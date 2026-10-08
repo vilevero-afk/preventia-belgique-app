@@ -80,7 +80,7 @@ void main() {
       'Danger personnalisé',
       'Score : 60',
       'Dégager le passage',
-      'Intégration PIU : Non',
+      'Intégration PAA/PGP',
     ]) {
       expect(draft, contains(text));
     }

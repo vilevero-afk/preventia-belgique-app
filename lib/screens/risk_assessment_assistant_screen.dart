@@ -22,6 +22,11 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   final _decisions = <String, String>{};
   List<FieldQuestion> _questions = [];
   List<AssistantDanger> _dangers = [];
+  List<AssistantAction> _actions = [];
+  String _status = 'Brouillon';
+  String _advisor = '';
+  String _finalConclusion = '';
+  String? _finalMarkdown;
   int _step = 0;
   int _revision = 0;
   bool _saving = false;
@@ -34,6 +39,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     'Dangers identifiés',
     'Cotation provisoire',
     'Conclusions proposées',
+    'Validation de l’analyse',
   ];
 
   @override
@@ -93,6 +99,8 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   }
 
   void _next() {
+    if (_step == 5) return;
+
     if (_step == 0) {
       final subject = _subject.text.trim();
       if (subject.isEmpty) {
@@ -119,6 +127,9 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     _dangers = RiskAssessmentAssistantService.dangersFor(subject);
     _seededSubject = subject;
     _conclusions.clear();
+    _actions.clear();
+    _finalMarkdown = null;
+    _status = 'Brouillon';
     _revision++;
   }
 
@@ -379,6 +390,8 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
               ),
           ],
         );
+      case 6:
+        return _validation();
       default:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -441,6 +454,216 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     }
   }
 
+  Widget _review(AdvisorReview review) => Column(
+    children: [
+      DropdownButtonFormField<AdvisorDecision>(
+        initialValue: review.decision,
+        decoration: const InputDecoration(labelText: 'Décision conseiller'),
+        items: AdvisorDecision.values
+            .map(
+              (d) => DropdownMenuItem(
+                value: d,
+                child: Text(switch (d) {
+                  AdvisorDecision.accepted => 'Accepter',
+                  AdvisorDecision.modified => 'Modifier',
+                  AdvisorDecision.refused => 'Refuser',
+                }),
+              ),
+            )
+            .toList(),
+        onChanged: (v) => setState(() => review.decision = v),
+      ),
+      _field(
+        'Commentaire conseiller',
+        review.advisorComment,
+        (v) => setState(() => review.advisorComment = v),
+      ),
+      _field(
+        'Responsable',
+        review.responsible,
+        (v) => setState(() => review.responsible = v),
+      ),
+      _field(
+        'Délai',
+        review.deadline,
+        (v) => setState(() => review.deadline = v),
+      ),
+      _field(
+        'Preuve finale attendue',
+        review.finalEvidence,
+        (v) => setState(() => review.finalEvidence = v),
+      ),
+    ],
+  );
+
+  Widget _validation() {
+    final errors = RiskAssessmentAssistantService.validationErrors(
+      _dangers,
+      _actions,
+    );
+    if (_finalMarkdown != null) {
+      return Column(
+        children: [
+          const Text('Analyse finale créée'),
+          OutlinedButton(
+            onPressed: _exportWord,
+            child: const Text('Exporter Word — analyse finale'),
+          ),
+          FilledButton(
+            onPressed: _saving ? null : _saveToCompanyFolder,
+            child: const Text('Sauvegarder dans le dossier prévention'),
+          ),
+          TextButton(
+            onPressed: () => _showDraft(_finalMarkdown!),
+            child: const Text('Consulter l’analyse finale'),
+          ),
+          TextButton(
+            onPressed: () => setState(() {
+              _finalMarkdown = null;
+              _status = 'En validation';
+            }),
+            child: const Text('Reprendre la validation'),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Le conseiller en prévention garde la décision finale. Destination : analyse finale, PAA/PGP, dossier prévention et preuves/photos.',
+        ),
+        for (final d in _dangers)
+          Card(
+            key: ObjectKey(d),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _field('Danger', d.danger, (v) => d.danger = v),
+                  _field(
+                    'Scénario plausible',
+                    d.scenario,
+                    (v) => d.scenario = v,
+                  ),
+                  _field('Personnes exposées', d.people, (v) => d.people = v),
+                  _rating('Gravité', d.gravity, (v) => d.gravity = v),
+                  _rating(
+                    'Probabilité',
+                    d.probability,
+                    (v) => d.probability = v,
+                  ),
+                  _rating('Exposition', d.exposure, (v) => d.exposure = v),
+                  Text(
+                    'Score : ${d.score ?? 'Non coté'} — Niveau : ${d.level}',
+                  ),
+                  _field(
+                    'Mesure proposée',
+                    d.proposedMeasure,
+                    (v) => d.proposedMeasure = v,
+                  ),
+                  _field('Preuve attendue', d.evidence, (v) => d.evidence = v),
+                  _review(d),
+                ],
+              ),
+            ),
+          ),
+        for (final a in _actions)
+          Card(
+            key: ObjectKey(a),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _field('Action', a.action, (v) => a.action = v),
+                  _field('Risque lié', a.linkedRisk, (v) => a.linkedRisk = v),
+                  _field('Priorité', a.priority, (v) => a.priority = v),
+                  DropdownButtonFormField<String>(
+                    initialValue: a.type,
+                    decoration: const InputDecoration(labelText: 'Type'),
+                    items: AssistantAction.types
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) => setState(() => a.type = v!),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: a.integration,
+                    decoration: const InputDecoration(
+                      labelText: 'Proposition d’intégration',
+                    ),
+                    items: ['PAA', 'PGP']
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) => setState(() => a.integration = v!),
+                  ),
+                  _review(a),
+                ],
+              ),
+            ),
+          ),
+        _field(
+          'Conseiller en prévention',
+          _advisor,
+          (v) => setState(() => _advisor = v),
+        ),
+        _field(
+          'Conclusion finale du conseiller',
+          _finalConclusion,
+          (v) => setState(() => _finalConclusion = v),
+        ),
+        if (errors.isNotEmpty) Text(errors.join('\n')),
+        FilledButton(
+          onPressed:
+              errors.isNotEmpty ||
+                  _advisor.trim().isEmpty ||
+                  _finalConclusion.trim().isEmpty ||
+                  _saving
+              ? null
+              : _createFinal,
+          child: const Text('Créer l’analyse finale'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _createFinal() async {
+    final markdown = RiskAssessmentAssistantService.finalAnalysis(
+      subject: _subject.text,
+      answers: _answers,
+      questions: _questions,
+      dangers: _dangers,
+      actions: _actions,
+      conclusion: _finalConclusion,
+      advisor: _advisor,
+    );
+    setState(() => _saving = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setString(
+        'risk_assessment_assistant_latest_final_markdown',
+        markdown,
+      )) {
+        throw StateError('Enregistrement impossible');
+      }
+      if (mounted) {
+        setState(() {
+          _finalMarkdown = markdown;
+          _status = 'Analyse finale créée';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d’enregistrer l’analyse finale.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Widget _rating(String label, int? value, ValueChanged<int?> change) =>
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -461,7 +684,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
 
   Future<void> _exportWord() async {
     final subject = _subject.text.trim();
-    if (subject.isEmpty || _questions.isEmpty) {
+    if (subject.isEmpty || (_questions.isEmpty && _finalMarkdown == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Créez d’abord le brouillon d’analyse assistée.'),
@@ -469,20 +692,22 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
       );
       return;
     }
-    final markdown = RiskAssessmentAssistantService.draft(
-      subject: subject,
-      answers: _answers,
-      questions: _questions,
-      dangers: _dangers,
-      conclusions: _conclusions,
-      decisions: _decisions,
-    );
+    final markdown =
+        _finalMarkdown ??
+        RiskAssessmentAssistantService.draft(
+          subject: subject,
+          answers: _answers,
+          questions: _questions,
+          dangers: _dangers,
+          conclusions: _conclusions,
+          decisions: _decisions,
+        );
     final now = DateTime.now();
     final document = PreventiaCompanyDocument(
       id: 'assistant-export',
       documentType: 'Analyse assistée de risques',
       title: 'Analyse assistée — $subject',
-      status: 'Brouillon à valider',
+      status: _status,
       createdAt: now,
       autoCreated: false,
       source: 'assistant_local',
@@ -514,19 +739,33 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   Future<void> _createDraft() async {
     setState(() => _saving = true);
     try {
-      final markdown = RiskAssessmentAssistantService.draft(
-        subject: _subject.text,
-        answers: _answers,
-        questions: _questions,
-        dangers: _dangers,
-        conclusions: _conclusions,
-        decisions: _decisions,
-      );
+      final markdown =
+          _finalMarkdown ??
+          RiskAssessmentAssistantService.draft(
+            subject: _subject.text,
+            answers: _answers,
+            questions: _questions,
+            dangers: _dangers,
+            conclusions: _conclusions,
+            decisions: _decisions,
+          );
       final prefs = await SharedPreferences.getInstance();
       // Dedicated storage, independent of history, company folders and exports.
       final saved = await prefs.setString(_draftKey, markdown);
       if (!saved) throw StateError('Enregistrement local indisponible');
-      if (mounted) await _showDraft(markdown);
+      if (mounted) {
+        await _showDraft(markdown);
+        if (mounted) {
+          setState(() {
+            _actions = RiskAssessmentAssistantService.actionsFor(
+              _dangers,
+              _conclusions['Actions proposées'] ?? '',
+            );
+            _status = 'En validation';
+            _step = 6;
+          });
+        }
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -545,23 +784,27 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   Future<void> _saveToCompanyFolder() async {
     setState(() => _saving = true);
     try {
-      final markdown = RiskAssessmentAssistantService.draft(
-        subject: _subject.text,
-        answers: _answers,
-        questions: _questions,
-        dangers: _dangers,
-        conclusions: _conclusions,
-        decisions: _decisions,
-      );
+      final markdown =
+          _finalMarkdown ??
+          RiskAssessmentAssistantService.draft(
+            subject: _subject.text,
+            answers: _answers,
+            questions: _questions,
+            dangers: _dangers,
+            conclusions: _conclusions,
+            decisions: _decisions,
+          );
       await PreventiaCompanyProjectService().saveAssistedDraft(
         subject: _subject.text,
         markdown: markdown,
+        status: _status,
+        actions: _actions,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Le brouillon d’analyse assistée a été sauvegardé dans le dossier société.',
+              'Le document d’analyse assistée a été sauvegardé dans le dossier prévention.',
             ),
           ),
         );
@@ -587,7 +830,11 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
   Future<void> _showDraft(String markdown) => showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Brouillon Markdown enregistré localement'),
+      title: Text(
+        _finalMarkdown == null
+            ? 'Brouillon Markdown enregistré localement'
+            : 'Analyse finale validée',
+      ),
       content: SizedBox(
         width: 700,
         child: SingleChildScrollView(child: SelectableText(markdown)),
@@ -617,6 +864,7 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
     appBar: AppBar(title: const Text('Assistant d’analyse de risques')),
     body: Column(
       children: [
+        Text('Statut : $_status'),
         Padding(
           padding: const EdgeInsets.all(12),
           child: Text(
@@ -631,7 +879,13 @@ class _AssistantState extends State<RiskAssessmentAssistantScreen> {
           child: Stepper(
             currentStep: _step,
             onStepContinue: _step < 5 ? _next : null,
-            onStepCancel: _step > 0 ? () => setState(() => _step--) : null,
+            onStepCancel: _step > 0
+                ? () => setState(() {
+                    _step--;
+                    _finalMarkdown = null;
+                    _status = 'Brouillon';
+                  })
+                : null,
             controlsBuilder: (context, details) => Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Wrap(
